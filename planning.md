@@ -103,10 +103,11 @@ List of past workouts. Calendar view showing a small icon per day representing w
 **Done when**: past workouts are browsable in list form and on a calendar with correct type icons.
 Notes: single `/history` page with List | Calendar toggle (`?view=`, `?month=YYYY-MM`); emoji type icons (`WORKOUT_TYPE_EMOJI` in `src/lib/types.ts`); added `/history/[id]` workout detail page (sets/weights/reps/notes) — dashboard rows link to it. Calendar groups by the UTC date part since workouts are stored at noon UTC.
 
-### Phase 4 — Volume trends
+### Phase 4 — Volume trends ✅ (built 2026-07-06)
 
 Weekly, monthly, yearly volume charts, plus exercise-specific trend charts (e.g. weight progression on bench press over time).
 **Done when**: charts render real data from the user's history and update as new workouts are logged.
+Notes: `/trends` page (Recharts) — total tonnage (weight × reps) bars with weekly/monthly/yearly toggle and zero-filled gaps, plus per-exercise top-set-weight line (defaults to most-logged exercise). Pure aggregation in `src/lib/volume.ts`. Demo account for testing: `npm run seed:demo` seeds `ironlog.demo@gmail.com` / `demo-IronLog-2026!` with 26 deterministic weeks of PPL data (`iron-log/scripts/`); re-running wipes and reseeds.
 
 ### Phase 5 — Rest timer
 
