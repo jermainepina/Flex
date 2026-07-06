@@ -114,7 +114,7 @@ export default async function TrendsPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Trends</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Stats</h1>
         <div className="flex gap-1 rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
           <Link
             href="/trends"

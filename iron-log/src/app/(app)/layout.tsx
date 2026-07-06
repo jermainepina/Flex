@@ -42,7 +42,7 @@ export default async function AppLayout({
               href="/trends"
               className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             >
-              Trends
+              Stats
             </Link>
           </nav>
           <div className="flex items-center gap-3">
