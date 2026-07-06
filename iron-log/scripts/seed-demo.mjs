@@ -5,7 +5,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
-import { DEMO_EMAIL, DEMO_PASSWORD, generateDemoData } from "./demo-data.mjs";
+import {
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+  EXERCISE_GROUPS,
+  generateDemoData,
+} from "./demo-data.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const env = Object.fromEntries(
@@ -54,7 +59,13 @@ async function main() {
 
   const { data: exRows, error: exErr } = await supabase
     .from("exercises")
-    .insert(data.exercises.map((name) => ({ user_id: userId, name })))
+    .insert(
+      data.exercises.map((name) => ({
+        user_id: userId,
+        name,
+        muscle_group: EXERCISE_GROUPS[name] ?? "other",
+      })),
+    )
     .select("id, name");
   if (exErr) throw new Error(`exercises: ${exErr.message}`);
   const exId = new Map(exRows.map((r) => [r.name, r.id]));

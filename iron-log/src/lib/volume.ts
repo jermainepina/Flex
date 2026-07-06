@@ -3,12 +3,26 @@
 // All date math uses the UTC date part, matching the noon-UTC storage
 // convention for workouts.date.
 
+import type { MuscleGroup } from "@/lib/types";
+
 export type Granularity = "weekly" | "monthly" | "yearly";
 
 export type VolumeRow = { date: string; weightKg: number; reps: number };
 export type VolumeBucket = { bucket: string; label: string; totalKg: number };
-export type TopSetRow = { workoutId: string; date: string; weightKg: number };
-export type TopSetPoint = { date: string; label: string; maxKg: number };
+export type SessionSetRow = {
+  workoutId: string;
+  date: string;
+  weightKg: number;
+  reps: number;
+};
+export type SessionBestPoint = { date: string; label: string; bestKg: number };
+export type GroupVolumeRow = VolumeRow & { muscleGroup: MuscleGroup };
+export type GroupVolumeBucket = {
+  bucket: string;
+  label: string;
+  groupsKg: Record<MuscleGroup, number>;
+};
+export type ProgressionRate = { latestBestKg: number; ratePerWeekKg: number };
 
 export const BUCKET_CAPS: Record<Granularity, number> = {
   weekly: 16,
@@ -85,13 +99,25 @@ export function aggregateVolume(
   return buckets.slice(-cap);
 }
 
-/** Heaviest set per workout for one exercise, sorted by date ascending. */
-export function topSetSeries(rows: TopSetRow[]): TopSetPoint[] {
-  const byWorkout = new Map<string, { date: string; maxKg: number }>();
+/** Epley estimated one-rep max. reps = 1 returns the weight itself. */
+export function epley1Rm(weightKg: number, reps: number): number {
+  return weightKg * (1 + reps / 30);
+}
+
+const metricValue = (row: SessionSetRow, metric: "weight" | "e1rm") =>
+  metric === "weight" ? row.weightKg : epley1Rm(row.weightKg, row.reps);
+
+/** Best set value (top-set weight or Epley e1RM) per workout, date ascending. */
+export function sessionBestSeries(
+  rows: SessionSetRow[],
+  metric: "weight" | "e1rm",
+): SessionBestPoint[] {
+  const byWorkout = new Map<string, { date: string; bestKg: number }>();
   for (const r of rows) {
+    const value = metricValue(r, metric);
     const cur = byWorkout.get(r.workoutId);
-    if (!cur || r.weightKg > cur.maxKg) {
-      byWorkout.set(r.workoutId, { date: r.date, maxKg: r.weightKg });
+    if (!cur || value > cur.bestKg) {
+      byWorkout.set(r.workoutId, { date: r.date, bestKg: value });
     }
   }
   return [...byWorkout.values()]
@@ -103,6 +129,74 @@ export function topSetSeries(rows: TopSetRow[]): TopSetPoint[] {
         day: "numeric",
         timeZone: "UTC",
       }),
-      maxKg: p.maxKg,
+      bestKg: p.bestKg,
     }));
+}
+
+/**
+ * Rolling rate of progression for one exercise, smoothing session-to-session
+ * noise: bucket best e1RM per calendar week, then rate = (latest weekly best −
+ * earliest weekly best within the trailing `windowWeeks` calendar weeks) ÷
+ * weeks between them. Needs ≥ 2 weekly points in the window.
+ */
+export function progressionRate(
+  rows: SessionSetRow[],
+  windowWeeks = 5,
+): ProgressionRate | null {
+  const weeklyBest = new Map<string, number>();
+  for (const r of rows) {
+    const wk = bucketKey(r.date, "weekly");
+    const e1rm = epley1Rm(r.weightKg, r.reps);
+    weeklyBest.set(wk, Math.max(weeklyBest.get(wk) ?? 0, e1rm));
+  }
+  const weeks = [...weeklyBest.keys()].sort();
+  if (weeks.length === 0) return null;
+
+  const latestWeek = weeks[weeks.length - 1];
+  const cutoff = new Date(`${latestWeek}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - 7 * (windowWeeks - 1));
+  const windowed = weeks.filter((w) => w >= cutoff.toISOString().slice(0, 10));
+  if (windowed.length < 2) return null;
+
+  const first = windowed[0];
+  const last = windowed[windowed.length - 1];
+  const weeksBetween =
+    (new Date(`${last}T00:00:00Z`).getTime() -
+      new Date(`${first}T00:00:00Z`).getTime()) /
+    (7 * 24 * 3600 * 1000);
+  return {
+    latestBestKg: weeklyBest.get(last)!,
+    ratePerWeekKg:
+      (weeklyBest.get(last)! - weeklyBest.get(first)!) / weeksBetween,
+  };
+}
+
+/**
+ * Weekly tonnage per muscle group, zero-filled between first and last week,
+ * capped to the most recent `cap` weeks.
+ */
+export function muscleGroupWeeklyVolume(
+  rows: GroupVolumeRow[],
+  groups: readonly MuscleGroup[],
+  cap = 12,
+): GroupVolumeBucket[] {
+  if (rows.length === 0) return [];
+  const totals = new Map<string, Record<MuscleGroup, number>>();
+  const emptyGroups = () =>
+    Object.fromEntries(groups.map((g) => [g, 0])) as Record<MuscleGroup, number>;
+  for (const r of rows) {
+    const key = bucketKey(r.date, "weekly");
+    if (!totals.has(key)) totals.set(key, emptyGroups());
+    totals.get(key)![r.muscleGroup] += r.weightKg * r.reps;
+  }
+  const keys = [...totals.keys()].sort();
+  const buckets: GroupVolumeBucket[] = [];
+  for (let k = keys[0]; k <= keys[keys.length - 1]; k = nextBucket(k, "weekly")) {
+    buckets.push({
+      bucket: k,
+      label: bucketLabel(k, "weekly"),
+      groupsKg: totals.get(k) ?? emptyGroups(),
+    });
+  }
+  return buckets.slice(-cap);
 }

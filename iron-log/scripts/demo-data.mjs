@@ -16,24 +16,29 @@ export const SKIPPED_WEEK_INDEX = 20; // "vacation" — tests zero-filled bucket
 // base/inc are in lb (rounded to 5 lb when applied), reps is the target.
 const PLAN = {
   push: [
-    { name: "Bench Press", base: 135, inc: 2.5, sets: 4, reps: 8 },
-    { name: "Overhead Press", base: 85, inc: 1.25, sets: 3, reps: 8 },
-    { name: "Incline Dumbbell Press", base: 50, inc: 1.25, sets: 3, reps: 10 },
+    { name: "Bench Press", group: "chest", base: 135, inc: 2.5, sets: 4, reps: 8 },
+    { name: "Overhead Press", group: "shoulders", base: 85, inc: 1.25, sets: 3, reps: 8 },
+    { name: "Incline Dumbbell Press", group: "chest", base: 50, inc: 1.25, sets: 3, reps: 10 },
   ],
   pull: [
-    { name: "Deadlift", base: 225, inc: 5, sets: 3, reps: 5 },
-    { name: "Barbell Row", base: 115, inc: 2.5, sets: 4, reps: 8 },
-    { name: "Lat Pulldown", base: 100, inc: 2.5, sets: 3, reps: 10 },
+    { name: "Deadlift", group: "back", base: 225, inc: 5, sets: 3, reps: 5 },
+    { name: "Barbell Row", group: "back", base: 115, inc: 2.5, sets: 4, reps: 8 },
+    { name: "Lat Pulldown", group: "back", base: 100, inc: 2.5, sets: 3, reps: 10 },
   ],
   legs: [
-    { name: "Squat", base: 185, inc: 5, sets: 4, reps: 6 },
-    { name: "Leg Press", base: 270, inc: 5, sets: 3, reps: 10 },
-    { name: "Leg Curl", base: 70, inc: 1.25, sets: 3, reps: 12 },
+    { name: "Squat", group: "legs", base: 185, inc: 5, sets: 4, reps: 6 },
+    { name: "Leg Press", group: "legs", base: 270, inc: 5, sets: 3, reps: 10 },
+    { name: "Leg Curl", group: "legs", base: 70, inc: 1.25, sets: 3, reps: 12 },
   ],
 };
 
 export const EXERCISE_NAMES = Object.values(PLAN).flatMap((list) =>
   list.map((e) => e.name),
+);
+
+/** name → muscle group, for seeding and for verifiers. */
+export const EXERCISE_GROUPS = Object.fromEntries(
+  Object.values(PLAN).flatMap((list) => list.map((e) => [e.name, e.group])),
 );
 
 function lcg(seed) {

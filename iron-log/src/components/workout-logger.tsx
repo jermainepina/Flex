@@ -9,9 +9,13 @@ import {
   type WorkoutPayload,
 } from "@/app/(app)/log/actions";
 import {
+  guessMuscleGroup,
+  MUSCLE_GROUP_LABELS,
+  MUSCLE_GROUPS,
   WORKOUT_TYPES,
   WORKOUT_TYPE_LABELS,
   type Exercise,
+  type MuscleGroup,
   type PreviousPerformance,
   type WorkoutType,
 } from "@/lib/types";
@@ -28,6 +32,8 @@ type Entry = {
   sets: SetRow[];
   showNewInput: boolean;
   newName: string;
+  newGroup: MuscleGroup;
+  newGroupTouched: boolean;
   prev: PreviousPerformance | null;
   prevLoading: boolean;
 };
@@ -42,6 +48,8 @@ function makeEntry(): Entry {
     sets: [{ weight: "", reps: "" }],
     showNewInput: false,
     newName: "",
+    newGroup: "other",
+    newGroupTouched: false,
     prev: null,
     prevLoading: false,
   };
@@ -90,7 +98,7 @@ export function WorkoutLogger({
 
   async function confirmNewExercise(entry: Entry) {
     setError(null);
-    const result = await createExercise(entry.newName);
+    const result = await createExercise(entry.newName, entry.newGroup);
     if (result.error || !result.data) {
       setError(result.error ?? "Could not create exercise.");
       return;
@@ -99,7 +107,7 @@ export function WorkoutLogger({
     setExercises((prev) =>
       [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
     );
-    updateEntry(entry.key, { newName: "" });
+    updateEntry(entry.key, { newName: "", newGroupTouched: false });
     selectExercise(entry.key, created.id);
   }
 
@@ -248,21 +256,46 @@ export function WorkoutLogger({
           </div>
 
           {entry.showNewInput && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 type="text"
                 placeholder="e.g. Bench Press"
                 value={entry.newName}
-                onChange={(e) => updateEntry(entry.key, { newName: e.target.value })}
+                onChange={(e) =>
+                  updateEntry(entry.key, {
+                    newName: e.target.value,
+                    // Follow the keyword guess until the user picks manually.
+                    ...(entry.newGroupTouched
+                      ? {}
+                      : { newGroup: guessMuscleGroup(e.target.value) }),
+                  })
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     confirmNewExercise(entry);
                   }
                 }}
-                className={`${inputClass} flex-1`}
+                className={`${inputClass} min-w-40 flex-1`}
                 autoFocus
               />
+              <select
+                value={entry.newGroup}
+                onChange={(e) =>
+                  updateEntry(entry.key, {
+                    newGroup: e.target.value as MuscleGroup,
+                    newGroupTouched: true,
+                  })
+                }
+                aria-label="Muscle group"
+                className={inputClass}
+              >
+                {MUSCLE_GROUPS.map((g) => (
+                  <option key={g} value={g}>
+                    {MUSCLE_GROUP_LABELS[g]}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => confirmNewExercise(entry)}

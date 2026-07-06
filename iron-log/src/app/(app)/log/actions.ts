@@ -3,18 +3,24 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
+  MUSCLE_GROUPS,
   WORKOUT_TYPES,
   type Exercise,
+  type MuscleGroup,
   type PreviousPerformance,
   type WorkoutType,
 } from "@/lib/types";
 
 export async function createExercise(
   name: string,
+  muscleGroup: MuscleGroup,
 ): Promise<{ data?: Exercise; error?: string }> {
   const trimmed = name.trim();
   if (!trimmed) return { error: "Exercise name is required." };
   if (trimmed.length > 100) return { error: "Exercise name is too long." };
+  if (!MUSCLE_GROUPS.includes(muscleGroup)) {
+    return { error: "Invalid muscle group." };
+  }
 
   const supabase = await createClient();
   const {
@@ -24,7 +30,7 @@ export async function createExercise(
 
   const { data, error } = await supabase
     .from("exercises")
-    .insert({ user_id: user.id, name: trimmed })
+    .insert({ user_id: user.id, name: trimmed, muscle_group: muscleGroup })
     .select("id, name")
     .single();
 

@@ -35,6 +35,7 @@ exercises
   id            uuid pk
   user_id       uuid references auth.users, not null
   name          text not null
+  muscle_group  muscle_group not null default 'other'  -- enum: chest/back/shoulders/arms/legs/core/other (added 0002, keyword-backfilled)
   created_at    timestamptz default now()
   -- unique(user_id, name)
 
@@ -108,6 +109,7 @@ Notes: single `/history` page with List | Calendar toggle (`?view=`, `?month=YYY
 Weekly, monthly, yearly volume charts, plus exercise-specific trend charts (e.g. weight progression on bench press over time).
 **Done when**: charts render real data from the user's history and update as new workouts are logged.
 Notes: `/trends` page (Recharts) — total tonnage (weight × reps) bars with weekly/monthly/yearly toggle and zero-filled gaps, plus per-exercise top-set-weight line (defaults to most-logged exercise). Pure aggregation in `src/lib/volume.ts`. Demo account for testing: `npm run seed:demo` seeds `ironlog.demo@gmail.com` / `demo-IronLog-2026!` with 26 deterministic weeks of PPL data (`iron-log/scripts/`); re-running wipes and reseeds.
+Trends v2 (2026-07-06): split into Overview | By exercise tabs. Overview adds main-lift cards (top 3 most-logged: best Epley e1RM + rolling rate of progression over trailing 5 weeks, lb/wk and ≈lb/mo) and weekly volume stacked by muscle group (7-slot colorblind-validated palette, legend + table view). By-exercise adds an estimated-1RM (Epley: weight × (1 + reps/30)) chart alongside top-set weight. Migration `0002_muscle_groups.sql` added `exercises.muscle_group` with keyword backfill; create-exercise flow now asks for the group (auto-guessed from the name — keep `guessMuscleGroup()` in `src/lib/types.ts` in sync with the SQL patterns).
 
 ### Phase 5 — Rest timer
 
