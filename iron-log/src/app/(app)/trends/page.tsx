@@ -6,6 +6,7 @@ import {
 } from "@/components/charts/muscle-group-chart";
 import { VolumeChart } from "@/components/charts/volume-chart";
 import { ExercisePicker } from "@/components/exercise-picker";
+import { LiftProgressGrid } from "@/components/lift-progress-grid";
 import { createClient } from "@/lib/supabase/server";
 import {
   MUSCLE_GROUP_LABELS,
@@ -95,9 +96,9 @@ export default async function TrendsPage({
     new Set((byExercise.get(id) ?? []).map((r) => r.workoutId)).size;
 
   const nameOf = new Map(exercises.map((e) => [e.id, e.name]));
-  const mainLifts = [...byExercise.keys()]
+  // Every logged lift, most-logged first — the grid shows 3, expands to all.
+  const lifts = [...byExercise.keys()]
     .sort((a, b) => sessionCount(b) - sessionCount(a))
-    .slice(0, 3)
     .map((id) => ({
       id,
       name: nameOf.get(id) ?? "Unknown",
@@ -106,7 +107,7 @@ export default async function TrendsPage({
 
   const selectedId =
     exercises.find((e) => e.id === params.exercise)?.id ??
-    mainLifts[0]?.id ??
+    lifts[0]?.id ??
     exercises[0]?.id;
   const selected = exercises.find((e) => e.id === selectedId);
 
@@ -136,7 +137,7 @@ export default async function TrendsPage({
           hasAnyData={hasAnyData}
           range={range}
           unit={unit}
-          mainLifts={mainLifts}
+          lifts={lifts}
         />
       ) : (
         <ExerciseTab
@@ -155,13 +156,13 @@ function OverviewTab({
   hasAnyData,
   range,
   unit,
-  mainLifts,
+  lifts,
 }: {
   rows: WideSetRow[];
   hasAnyData: boolean;
   range: Granularity;
   unit: WeightUnit;
-  mainLifts: { id: string; name: string; rate: ReturnType<typeof progressionRate> }[];
+  lifts: { id: string; name: string; rate: ReturnType<typeof progressionRate> }[];
 }) {
   const volumeData = aggregateVolume(
     rows.map((r) => ({
@@ -198,12 +199,12 @@ function OverviewTab({
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
         <h2 className="font-medium">
-          Main lifts{" "}
+          Progression{" "}
           <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
-            (most-logged, est. 1RM trend over the last 5 weeks)
+            (est. 1RM trend over the last 5 weeks, most-logged first)
           </span>
         </h2>
-        {mainLifts.length === 0 ? (
+        {lifts.length === 0 ? (
           <p className={emptyBox}>
             No workouts yet — trends appear once you{" "}
             <Link href="/log" className="font-medium underline">
@@ -212,37 +213,19 @@ function OverviewTab({
             .
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-3">
-            {mainLifts.map((lift) => (
-              <div
-                key={lift.id}
-                className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-              >
-                <p className="truncate text-sm font-medium">{lift.name}</p>
-                {lift.rate ? (
-                  <>
-                    <p className="mt-2 text-2xl font-semibold tracking-tight">
-                      {formatWeight(lift.rate.latestBestKg, unit)}
-                    </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      best est. 1RM this week
-                    </p>
-                    <p className="mt-2 text-sm font-medium">
-                      {signed(rate1(lift.rate.ratePerWeekKg))} {unit}/wk
-                      <span className="ml-1 font-normal text-zinc-500 dark:text-zinc-400">
-                        ≈ {signed(Math.round(rate1(lift.rate.ratePerWeekKg) * 4.33 * 10) / 10)}{" "}
-                        {unit}/mo
-                      </span>
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    Not enough recent data.
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
+          <LiftProgressGrid
+            cards={lifts.map((lift) => ({
+              id: lift.id,
+              name: lift.name,
+              best: lift.rate ? formatWeight(lift.rate.latestBestKg, unit) : null,
+              rateWk: lift.rate
+                ? `${signed(rate1(lift.rate.ratePerWeekKg))} ${unit}/wk`
+                : null,
+              rateMo: lift.rate
+                ? `≈ ${signed(Math.round(rate1(lift.rate.ratePerWeekKg) * 4.33 * 10) / 10)} ${unit}/mo`
+                : null,
+            }))}
+          />
         )}
       </section>
 
