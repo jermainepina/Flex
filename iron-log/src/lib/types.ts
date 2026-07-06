@@ -22,6 +22,17 @@ export const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   other: "Other",
 };
 
+export const WORKOUT_TYPE_EMOJI: Record<WorkoutType, string> = {
+  push: "💪",
+  pull: "🧗",
+  legs: "🦵",
+  upper: "🔼",
+  lower: "🔽",
+  full_body: "🏋️",
+  cardio: "🏃",
+  other: "⭐",
+};
+
 export type Exercise = {
   id: string;
   name: string;

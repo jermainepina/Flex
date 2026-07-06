@@ -97,10 +97,11 @@ Notes: app lives in `iron-log/`. Next.js 16 — route protection uses `src/proxy
 Exercise dropdown with "create new exercise," set/rep/weight entry with multiple sets per exercise, notes, submit to save a workout. Shows previous weight/reps for the selected exercise, scoped to the logged-in user.
 **Done when**: a logged-in user can log a full workout with several exercises and it persists in Supabase, correctly scoped to their account only.
 
-### Phase 3 — History + calendar view
+### Phase 3 — History + calendar view ✅ (built 2026-07-06)
 
 List of past workouts. Calendar view showing a small icon per day representing workout type (push/pull/legs/etc, from `workouts.type`).
 **Done when**: past workouts are browsable in list form and on a calendar with correct type icons.
+Notes: single `/history` page with List | Calendar toggle (`?view=`, `?month=YYYY-MM`); emoji type icons (`WORKOUT_TYPE_EMOJI` in `src/lib/types.ts`); added `/history/[id]` workout detail page (sets/weights/reps/notes) — dashboard rows link to it. Calendar groups by the UTC date part since workouts are stored at noon UTC.
 
 ### Phase 4 — Volume trends
 

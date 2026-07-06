@@ -32,9 +32,17 @@ export default async function DashboardPage() {
       </div>
 
       <section>
-        <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          Recent workouts
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            Recent workouts
+          </h2>
+          <Link
+            href="/history"
+            className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            View all →
+          </Link>
+        </div>
         {workouts.length === 0 ? (
           <p className="mt-3 rounded-lg border border-dashed border-zinc-300 p-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
             No workouts yet. Log your first one to get started.
@@ -44,22 +52,26 @@ export default async function DashboardPage() {
             {workouts.map((w) => {
               const exerciseCount = w.workout_exercises[0]?.count ?? 0;
               return (
-                <li
-                  key={w.id}
-                  className="flex items-center justify-between px-4 py-3 text-sm"
-                >
-                  <span className="font-medium">
-                    {new Date(w.date).toLocaleDateString(undefined, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </span>
-                  <span className="text-zinc-500 dark:text-zinc-400">
-                    {w.type ? `${WORKOUT_TYPE_LABELS[w.type]} · ` : ""}
-                    {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"}
-                  </span>
+                <li key={w.id}>
+                  <Link
+                    href={`/history/${w.id}`}
+                    className="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                  >
+                    <span className="font-medium">
+                      {new Date(w.date).toLocaleDateString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        timeZone: "UTC",
+                      })}
+                    </span>
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      {w.type ? `${WORKOUT_TYPE_LABELS[w.type]} · ` : ""}
+                      {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"}
+                      <span className="ml-2 text-zinc-400">›</span>
+                    </span>
+                  </Link>
                 </li>
               );
             })}
