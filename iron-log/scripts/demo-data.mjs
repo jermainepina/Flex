@@ -41,6 +41,51 @@ export const EXERCISE_GROUPS = Object.fromEntries(
   Object.values(PLAN).flatMap((list) => list.map((e) => [e.name, e.group])),
 );
 
+export const DAY_NAMES = {
+  push: "Push Day",
+  pull: "Pull Day",
+  legs: "Leg Day",
+  cardio: "Cardio",
+};
+
+/**
+ * Workout templates matching the PLAN days, with per-exercise set counts.
+ * Bench Press carries notes + suggested per-set weights (kg) to exercise
+ * those template features; everything else leaves them null.
+ */
+export const TEMPLATES = [
+  {
+    name: "Push Day",
+    exercises: PLAN.push.map((e) => ({
+      name: e.name,
+      sets: e.sets,
+      notes: e.name === "Bench Press" ? "Pause the last set" : null,
+      weightsKg:
+        e.name === "Bench Press"
+          ? Array.from({ length: e.sets }, () => lbToKg(135))
+          : null,
+    })),
+  },
+  {
+    name: "Pull Day",
+    exercises: PLAN.pull.map((e) => ({
+      name: e.name,
+      sets: e.sets,
+      notes: null,
+      weightsKg: null,
+    })),
+  },
+  {
+    name: "Leg Day",
+    exercises: PLAN.legs.map((e) => ({
+      name: e.name,
+      sets: e.sets,
+      notes: null,
+      weightsKg: null,
+    })),
+  },
+];
+
 function lcg(seed) {
   let s = seed >>> 0;
   return () => {
@@ -161,6 +206,7 @@ export function generateDemoData(anchorDay) {
       workouts.push({
         date: isoAddDays(monday, offset),
         type,
+        name: DAY_NAMES[type],
         entries,
         durationSeconds: 2700 + Math.floor(rand() * 1800), // 45–75 min
       });
@@ -171,6 +217,7 @@ export function generateDemoData(anchorDay) {
       workouts.push({
         date: isoAddDays(monday, 5),
         type: "cardio",
+        name: DAY_NAMES.cardio,
         entries: [],
         durationSeconds: 1500 + Math.floor(rand() * 900), // 25–40 min
       });

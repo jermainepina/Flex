@@ -16,14 +16,11 @@ import {
   guessMuscleGroup,
   MUSCLE_GROUP_LABELS,
   MUSCLE_GROUPS,
-  WORKOUT_TYPES,
-  WORKOUT_TYPE_LABELS,
   type Exercise,
   type MuscleGroup,
   type PreviousPerformance,
-  type WorkoutType,
 } from "@/lib/types";
-import { formatWeight, unitToKg, type WeightUnit } from "@/lib/units";
+import { formatWeight, kgToUnit, unitToKg, type WeightUnit } from "@/lib/units";
 
 const NEW_EXERCISE = "__new__";
 
@@ -43,20 +40,37 @@ type Entry = {
   bests: ExerciseBests | null;
 };
 
+export type InitialTemplate = {
+  id: string;
+  name: string;
+  entries: {
+    exerciseId: string;
+    sets: number;
+    notes: string | null;
+    weightsKg: (number | null)[]; // per set; null = leave blank
+  }[];
+};
+
 let nextKey = 0;
 
-function makeEntry(): Entry {
+function makeEntry(exerciseId = "", setCount = 1, notes = "", weights: string[] = []): Entry {
   return {
     key: nextKey++,
-    exerciseId: "",
-    notes: "",
-    sets: [{ weight: "", reps: "", done: false }],
+    exerciseId,
+    notes,
+    sets: Array.from({ length: Math.max(1, setCount) }, (_, i) => ({
+      weight: weights[i] ?? "",
+      reps: "",
+      done: false,
+    })),
     showNewInput: false,
     newName: "",
     newGroup: "other",
     newGroupTouched: false,
     prev: null,
-    prevLoading: false,
+    // Pre-selected (template) entries start in loading state; the mount
+    // effect fetches their prev/bests asynchronously.
+    prevLoading: exerciseId !== "",
     bests: null,
   };
 }
@@ -72,15 +86,30 @@ const inputClass =
 export function WorkoutLogger({
   initialExercises,
   unit,
+  initialTemplate = null,
 }: {
   initialExercises: Exercise[];
   unit: WeightUnit;
+  initialTemplate?: InitialTemplate | null;
 }) {
   const router = useRouter();
   const [exercises, setExercises] = useState(initialExercises);
-  const [entries, setEntries] = useState<Entry[]>([makeEntry()]);
+  const [entries, setEntries] = useState<Entry[]>(() =>
+    initialTemplate
+      ? initialTemplate.entries.map((e) =>
+          makeEntry(
+            e.exerciseId,
+            e.sets,
+            e.notes ?? "",
+            e.weightsKg.map((w) =>
+              w === null ? "" : String(Math.round(kgToUnit(w, unit) * 10) / 10),
+            ),
+          ),
+        )
+      : [makeEntry()],
+  );
   const [date, setDate] = useState(today);
-  const [type, setType] = useState<WorkoutType>("other");
+  const [name, setName] = useState(initialTemplate?.name ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   // Session start is captured in an effect (render must stay pure); the bar
@@ -89,6 +118,25 @@ export function WorkoutLogger({
   const barRef = useRef<LogSessionBarHandle>(null);
   useEffect(() => {
     startedAtRef.current = Date.now();
+  }, []);
+
+  // Template-prefilled entries need their previous-performance + PR bests
+  // loaded, same as a manual selection would (they mount with
+  // prevLoading=true; all setState here happens in async callbacks).
+  useEffect(() => {
+    for (const entry of entries) {
+      if (!entry.exerciseId || entry.bests || !entry.prevLoading) continue;
+      Promise.all([
+        getPreviousPerformance(entry.exerciseId),
+        getExerciseBests(entry.exerciseId),
+      ])
+        .then(([prev, bests]) =>
+          updateEntry(entry.key, { prev, bests, prevLoading: false }),
+        )
+        .catch(() => updateEntry(entry.key, { prevLoading: false }));
+    }
+    // Mount-only: hydrate the template's pre-selected exercises.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function updateEntry(key: number, patch: Partial<Entry>) {
@@ -185,10 +233,11 @@ export function WorkoutLogger({
 
     const payload: WorkoutPayload = {
       date,
-      type,
+      name,
       durationSeconds: startedAtRef.current
         ? Math.round((Date.now() - startedAtRef.current) / 1000)
         : 0,
+      templateId: initialTemplate?.id ?? null,
       exercises: [],
     };
     for (const entry of entries) {
@@ -248,19 +297,15 @@ export function WorkoutLogger({
             className={inputClass}
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Type
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as WorkoutType)}
+        <label className="flex min-w-48 flex-1 flex-col gap-1 text-sm font-medium">
+          Name
+          <input
+            type="text"
+            placeholder="e.g. Push Day (optional)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className={inputClass}
-          >
-            {WORKOUT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {WORKOUT_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
+          />
         </label>
       </div>
 

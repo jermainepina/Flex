@@ -75,6 +75,7 @@ template_exercises
   template_id   uuid references templates(id) on delete cascade
   exercise_id   uuid references exercises(id)
   position      int             -- drag-and-drop order
+  target_sets   int not null default 1  -- empty set rows to pre-fill when starting from the template (added 0004)
 ```
 
 Notes:
@@ -124,10 +125,11 @@ At log time, compare each set against the user's historical best for that exerci
 **Done when**: logging a set that beats history is visibly flagged in the UI immediately, and the flag persists in history afterward.
 Notes: rules live in `src/lib/pr.ts` (shared client/server; replica in `scripts/demo-data.mjs` — keep in sync): one weight-PR per session (heaviest set beating history) plus rep-PRs only at previously-lifted weights (session-best reps beating the historical best there). Logger fetches per-exercise bests on selection and outlines a block **gold** with PR chips live; `saveWorkout` recomputes authoritatively and persists `is_pr`. Also added: focus highlight on the exercise block being edited, and a post-save summary page (`/history/[id]/summary`) with duration / total sets / volume count-up and a staggered gold-star PR animation.
 
-### Phase 7 — Template builder
+### Phase 7 — Template builder ✅ (built 2026-07-08)
 
 Create and name workout templates. Drag-and-drop exercises to build/reorder a template. Starting a workout from a template pre-fills the exercise list (and can pre-fill workout type).
 **Done when**: a user can build a template, reorder it via drag-and-drop, and start a new workout pre-populated from it.
+Notes: `/templates` (list with Start/Edit/Delete) + `/templates/new` + `/templates/[id]` editor (`src/components/template-editor.tsx`, dnd-kit sortable with pointer + keyboard sensors). Templates store a per-exercise `target_sets` (migration `0004`): starting a workout pre-fills that many empty set rows per exercise, pre-selects type, and auto-loads prev/PR data; entry points are the template cards and a "Start from template" picker on `/log`. Saved workouts record `template_id` (verified against RLS before insert).
 
 ### Phase 8 — AI assistant
 

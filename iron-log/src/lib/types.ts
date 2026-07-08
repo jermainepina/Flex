@@ -22,16 +22,33 @@ export const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   other: "Other",
 };
 
-export const WORKOUT_TYPE_EMOJI: Record<WorkoutType, string> = {
-  push: "💪",
-  pull: "🧗",
-  legs: "🦵",
-  upper: "🔼",
-  lower: "🔽",
-  full_body: "🏋️",
-  cardio: "🏃",
-  other: "⭐",
-};
+/**
+ * Workouts are labeled by their free-text name; rows from before the name
+ * column existed fall back to their legacy type label.
+ */
+export function workoutDisplayName(
+  name: string | null,
+  type: WorkoutType | null,
+): string {
+  if (name?.trim()) return name.trim();
+  if (type && type in WORKOUT_TYPE_LABELS) return WORKOUT_TYPE_LABELS[type];
+  return "Workout";
+}
+
+/**
+ * Auto-name for a workout saved without a name: the smallest untaken
+ * "Workout N" among the user's existing workout names (case-insensitive).
+ */
+export function nextDefaultName(existing: string[]): string {
+  const taken = new Set<number>();
+  for (const name of existing) {
+    const m = /^workout (\d+)$/i.exec(name.trim());
+    if (m) taken.add(Number(m[1]));
+  }
+  let n = 1;
+  while (taken.has(n)) n++;
+  return `Workout ${n}`;
+}
 
 // Fixed chart order — each group keeps its palette slot regardless of which
 // groups have data (color follows the entity, never its rank).

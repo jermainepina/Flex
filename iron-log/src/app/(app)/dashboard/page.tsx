@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { WORKOUT_TYPE_LABELS, type WorkoutType } from "@/lib/types";
+import { workoutDisplayName, type WorkoutType } from "@/lib/types";
 
 type RecentWorkout = {
   id: string;
   date: string;
-  type: WorkoutType | null;
+  name: string | null;
+  type: WorkoutType | null; // legacy fallback label
   workout_exercises: { count: number }[];
 };
 
@@ -13,7 +14,7 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("workouts")
-    .select("id, date, type, workout_exercises(count)")
+    .select("id, date, name, type, workout_exercises(count)")
     .order("date", { ascending: false })
     .limit(5);
 
@@ -67,8 +68,8 @@ export default async function DashboardPage() {
                       })}
                     </span>
                     <span className="text-zinc-500 dark:text-zinc-400">
-                      {w.type ? `${WORKOUT_TYPE_LABELS[w.type]} · ` : ""}
-                      {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"}
+                      {workoutDisplayName(w.name, w.type)} · {exerciseCount}{" "}
+                      exercise{exerciseCount === 1 ? "" : "s"}
                       <span className="ml-2 text-zinc-400">›</span>
                     </span>
                   </Link>

@@ -2,17 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrChip } from "@/components/pr-chip";
 import { createClient } from "@/lib/supabase/server";
-import {
-  WORKOUT_TYPE_EMOJI,
-  WORKOUT_TYPE_LABELS,
-  type WorkoutType,
-} from "@/lib/types";
+import { workoutDisplayName, type WorkoutType } from "@/lib/types";
 import { formatWeight, type WeightUnit } from "@/lib/units";
 
 type WorkoutDetail = {
   id: string;
   date: string;
-  type: WorkoutType | null;
+  name: string | null;
+  type: WorkoutType | null; // legacy fallback label
   workout_exercises: {
     id: string;
     notes: string | null;
@@ -38,7 +35,7 @@ export default async function WorkoutDetailPage({
     supabase
       .from("workouts")
       .select(
-        "id, date, type, workout_exercises(id, notes, position, exercises(name), sets(set_number, weight, reps, is_pr))",
+        "id, date, name, type, workout_exercises(id, notes, position, exercises(name), sets(set_number, weight, reps, is_pr))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -64,6 +61,9 @@ export default async function WorkoutDetailPage({
           ← History
         </Link>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+          {workoutDisplayName(workout.name, workout.type)}
+        </h1>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           {new Date(workout.date).toLocaleDateString(undefined, {
             weekday: "long",
             month: "long",
@@ -71,13 +71,7 @@ export default async function WorkoutDetailPage({
             year: "numeric",
             timeZone: "UTC",
           })}
-        </h1>
-        {workout.type && (
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            <span aria-hidden>{WORKOUT_TYPE_EMOJI[workout.type]}</span>{" "}
-            {WORKOUT_TYPE_LABELS[workout.type]}
-          </p>
-        )}
+        </p>
       </div>
 
       {exercises.map((entry) => {

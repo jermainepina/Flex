@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import {
-  WORKOUT_TYPE_EMOJI,
-  WORKOUT_TYPE_LABELS,
-  type WorkoutType,
-} from "@/lib/types";
+import { workoutDisplayName, type WorkoutType } from "@/lib/types";
 
 type HistoryWorkout = {
   id: string;
   date: string;
-  type: WorkoutType | null;
+  name: string | null;
+  type: WorkoutType | null; // legacy fallback label for pre-name rows
   workout_exercises: { count: number }[];
 };
 
@@ -54,7 +51,7 @@ export default async function HistoryPage({
   searchParams: Promise<{ view?: string; month?: string }>;
 }) {
   const params = await searchParams;
-  const view = params.view === "calendar" ? "calendar" : "list";
+  const view = params.view === "list" ? "list" : "calendar";
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month ?? "")
     ? (params.month as string)
     : currentMonth();
@@ -65,16 +62,16 @@ export default async function HistoryPage({
         <h1 className="text-2xl font-semibold tracking-tight">History</h1>
         <div className="flex gap-1 rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
           <Link
-            href="/history"
-            className={`${toggleBase} ${view === "list" ? toggleOn : toggleOff}`}
-          >
-            List
-          </Link>
-          <Link
-            href={`/history?view=calendar&month=${month}`}
+            href={`/history?month=${month}`}
             className={`${toggleBase} ${view === "calendar" ? toggleOn : toggleOff}`}
           >
             Calendar
+          </Link>
+          <Link
+            href="/history?view=list"
+            className={`${toggleBase} ${view === "list" ? toggleOn : toggleOff}`}
+          >
+            List
           </Link>
         </div>
       </div>
@@ -88,7 +85,7 @@ async function ListView() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("workouts")
-    .select("id, date, type, workout_exercises(count)")
+    .select("id, date, name, type, workout_exercises(count)")
     .order("date", { ascending: false });
   const workouts = (data ?? []) as HistoryWorkout[];
 
@@ -129,18 +126,17 @@ async function ListView() {
                     href={`/history/${w.id}`}
                     className="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
                   >
-                    <span className="flex items-center gap-2 font-medium">
-                      {w.type && (
-                        <span aria-hidden>{WORKOUT_TYPE_EMOJI[w.type]}</span>
-                      )}
+                    <span className="flex min-w-0 items-baseline gap-2 font-medium">
                       {formatDay(w.date, {
                         weekday: "short",
                         month: "short",
                         day: "numeric",
                       })}
+                      <span className="truncate font-normal text-zinc-500 dark:text-zinc-400">
+                        {workoutDisplayName(w.name, w.type)}
+                      </span>
                     </span>
-                    <span className="text-zinc-500 dark:text-zinc-400">
-                      {w.type ? `${WORKOUT_TYPE_LABELS[w.type]} · ` : ""}
+                    <span className="shrink-0 text-zinc-500 dark:text-zinc-400">
                       {count} exercise{count === 1 ? "" : "s"}
                       <span className="ml-2 text-zinc-400">›</span>
                     </span>
@@ -159,11 +155,14 @@ async function CalendarView({ month }: { month: string }) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("workouts")
-    .select("id, date, type")
+    .select("id, date, name, type")
     .gte("date", `${month}-01T00:00:00Z`)
     .lt("date", `${shiftMonth(month, 1)}-01T00:00:00Z`)
     .order("date");
-  const workouts = (data ?? []) as Pick<HistoryWorkout, "id" | "date" | "type">[];
+  const workouts = (data ?? []) as Pick<
+    HistoryWorkout,
+    "id" | "date" | "name" | "type"
+  >[];
 
   const byDay = new Map<string, typeof workouts>();
   for (const w of workouts) {
@@ -217,25 +216,28 @@ async function CalendarView({ month }: { month: string }) {
           return (
             <div
               key={dayKey}
-              className={`flex min-h-16 flex-col items-center gap-1 rounded-lg border p-1.5 text-xs ${
+              className={`flex min-h-16 flex-col gap-1 rounded-lg border p-1.5 text-xs ${
                 isToday
                   ? "border-zinc-900 dark:border-zinc-100"
                   : "border-zinc-200 dark:border-zinc-800"
               }`}
             >
-              <span className="text-zinc-500 dark:text-zinc-400">{day}</span>
-              <span className="flex flex-wrap justify-center gap-0.5">
-                {dayWorkouts.map((w) => (
+              <span className="text-center text-zinc-500 dark:text-zinc-400">
+                {day}
+              </span>
+              {dayWorkouts.map((w) => {
+                const label = workoutDisplayName(w.name, w.type);
+                return (
                   <Link
                     key={w.id}
                     href={`/history/${w.id}`}
-                    title={w.type ? WORKOUT_TYPE_LABELS[w.type] : "Workout"}
-                    className="text-base leading-none hover:scale-125"
+                    title={label}
+                    className="block w-full truncate rounded bg-zinc-100 px-1 py-0.5 text-[10px] font-medium leading-tight text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                   >
-                    {w.type ? WORKOUT_TYPE_EMOJI[w.type] : "⭐"}
+                    {label}
                   </Link>
-                ))}
-              </span>
+                );
+              })}
             </div>
           );
         })}

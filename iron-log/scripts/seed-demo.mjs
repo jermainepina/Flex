@@ -10,6 +10,7 @@ import {
   DEMO_PASSWORD,
   EXERCISE_GROUPS,
   generateDemoData,
+  TEMPLATES,
 } from "./demo-data.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -50,7 +51,9 @@ async function main() {
   }
   const userId = auth.data.user.id;
 
-  // Wipe previous demo data (cascades take children).
+  // Wipe previous demo data (cascades take children). Templates first so
+  // exercises aren't blocked by template_exercises FKs.
+  await supabase.from("templates").delete().eq("user_id", userId);
   await supabase.from("workouts").delete().eq("user_id", userId);
   await supabase.from("exercises").delete().eq("user_id", userId);
 
@@ -79,7 +82,7 @@ async function main() {
         workoutBatch.map((w) => ({
           user_id: userId,
           date: `${w.date}T12:00:00Z`,
-          type: w.type,
+          name: w.name,
           duration_seconds: w.durationSeconds,
         })),
       )
@@ -119,7 +122,27 @@ async function main() {
     setCount += setInput.length;
   }
 
-  console.log(`Seeded demo user with ${workoutCount} workouts / ${setCount} sets (anchor ${anchor}).`);
+  for (const t of TEMPLATES) {
+    const { data: tRow, error: tErr } = await supabase
+      .from("templates")
+      .insert({ user_id: userId, name: t.name })
+      .select("id")
+      .single();
+    if (tErr) throw new Error(`templates: ${tErr.message}`);
+    const { error: teErr } = await supabase.from("template_exercises").insert(
+      t.exercises.map((e, i) => ({
+        template_id: tRow.id,
+        exercise_id: exId.get(e.name),
+        position: i,
+        target_sets: e.sets,
+        notes: e.notes,
+        target_weights: e.weightsKg,
+      })),
+    );
+    if (teErr) throw new Error(`template_exercises: ${teErr.message}`);
+  }
+
+  console.log(`Seeded demo user with ${workoutCount} workouts / ${setCount} sets + ${TEMPLATES.length} templates (anchor ${anchor}).`);
   console.log(`Sign in to browse:  ${DEMO_EMAIL}  /  ${DEMO_PASSWORD}`);
 }
 

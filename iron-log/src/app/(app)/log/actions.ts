@@ -5,11 +5,10 @@ import { collectBests, computePrFlags, type ExerciseBests } from "@/lib/pr";
 import { createClient } from "@/lib/supabase/server";
 import {
   MUSCLE_GROUPS,
-  WORKOUT_TYPES,
+  nextDefaultName,
   type Exercise,
   type MuscleGroup,
   type PreviousPerformance,
-  type WorkoutType,
 } from "@/lib/types";
 
 export async function createExercise(
@@ -103,14 +102,15 @@ export type ExerciseEntryPayload = {
 
 export type WorkoutPayload = {
   date: string; // YYYY-MM-DD
-  type: WorkoutType;
+  name: string; // blank -> auto-numbered "Workout N"
   durationSeconds: number;
+  templateId?: string | null;
   exercises: ExerciseEntryPayload[];
 };
 
 function validate(payload: WorkoutPayload): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.date)) return "Invalid date.";
-  if (!WORKOUT_TYPES.includes(payload.type)) return "Invalid workout type.";
+  if (payload.name.trim().length > 100) return "Workout name is too long.";
   if (
     !Number.isFinite(payload.durationSeconds) ||
     payload.durationSeconds < 0 ||
@@ -152,14 +152,37 @@ export async function saveWorkout(
     payload.exercises.map((entry) => getExerciseBests(entry.exerciseId)),
   );
 
+  // Record which template started this workout — only if it's really the
+  // user's (RLS-scoped fetch); otherwise drop it silently.
+  let templateId: string | null = null;
+  if (payload.templateId) {
+    const { data: tpl } = await supabase
+      .from("templates")
+      .select("id")
+      .eq("id", payload.templateId)
+      .maybeSingle();
+    templateId = tpl?.id ?? null;
+  }
+
+  // Blank name -> smallest untaken "Workout N" among this user's workouts.
+  let name = payload.name.trim();
+  if (!name) {
+    const { data: named } = await supabase
+      .from("workouts")
+      .select("name")
+      .ilike("name", "workout %");
+    name = nextDefaultName((named ?? []).map((r) => r.name ?? ""));
+  }
+
   // Stored at noon UTC so the calendar day doesn't shift across timezones.
   const { data: workout, error: workoutError } = await supabase
     .from("workouts")
     .insert({
       user_id: user.id,
       date: `${payload.date}T12:00:00Z`,
-      type: payload.type,
+      name,
       duration_seconds: Math.round(payload.durationSeconds),
+      template_id: templateId,
     })
     .select("id")
     .single();
