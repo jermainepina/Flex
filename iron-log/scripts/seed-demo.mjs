@@ -80,6 +80,7 @@ async function main() {
           user_id: userId,
           date: `${w.date}T12:00:00Z`,
           type: w.type,
+          duration_seconds: w.durationSeconds,
         })),
       )
       .select("id");
@@ -108,6 +109,7 @@ async function main() {
         set_number: si + 1,
         weight: s.weightKg,
         reps: s.reps,
+        is_pr: s.isPr ?? false,
       })),
     );
     for (const setBatch of chunk(setInput, 500)) {

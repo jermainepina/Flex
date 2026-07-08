@@ -40,12 +40,13 @@ exercises
   -- unique(user_id, name)
 
 workouts
-  id            uuid pk
-  user_id       uuid references auth.users, not null
-  date          timestamptz not null
-  type          text            -- e.g. 'push', 'pull', 'legs', 'upper', 'lower', 'full_body' — drives the calendar icon
-  template_id   uuid references templates(id), nullable
-  created_at    timestamptz default now()
+  id                uuid pk
+  user_id           uuid references auth.users, not null
+  date              timestamptz not null
+  type              text            -- e.g. 'push', 'pull', 'legs', 'upper', 'lower', 'full_body' — drives the calendar icon
+  template_id       uuid references templates(id), nullable
+  duration_seconds  int, nullable   -- logging-session length (added 0003, shown on summary page)
+  created_at        timestamptz default now()
 
 workout_exercises
   id            uuid pk
@@ -111,15 +112,17 @@ Weekly, monthly, yearly volume charts, plus exercise-specific trend charts (e.g.
 Notes: `/trends` page (Recharts) — total tonnage (weight × reps) bars with weekly/monthly/yearly toggle and zero-filled gaps, plus per-exercise top-set-weight line (defaults to most-logged exercise). Pure aggregation in `src/lib/volume.ts`. Demo account for testing: `npm run seed:demo` seeds `ironlog.demo@gmail.com` / `demo-IronLog-2026!` with 26 deterministic weeks of PPL data (`iron-log/scripts/`); re-running wipes and reseeds.
 Trends v2 (2026-07-06): split into Overview | By exercise tabs. Overview adds main-lift cards (top 3 most-logged: best Epley e1RM + rolling rate of progression over trailing 5 weeks, lb/wk and ≈lb/mo) and weekly volume stacked by muscle group (7-slot colorblind-validated palette, legend + table view). By-exercise adds an estimated-1RM (Epley: weight × (1 + reps/30)) chart alongside top-set weight. Migration `0002_muscle_groups.sql` added `exercises.muscle_group` with keyword backfill; create-exercise flow now asks for the group (auto-guessed from the name — keep `guessMuscleGroup()` in `src/lib/types.ts` in sync with the SQL patterns).
 
-### Phase 5 — Rest timer
+### Phase 5 — Rest timer ✅ (built 2026-07-08)
 
 Countdown timer between sets during logging, client-side.
 **Done when**: timer starts after a set is logged, is visible during the workout, and can be adjusted/skipped.
+Notes: each set row has a done checkmark; checking it starts/restarts the countdown in a sticky bottom bar (`src/components/rest-timer.tsx`) that also shows the elapsed workout clock (starts on page open, saved to `workouts.duration_seconds`). Presets 60/90/120/180s (persisted in localStorage), +15s, Skip; silent at zero by choice. Countdown anchored to an end timestamp so background-tab throttling can't drift it.
 
-### Phase 6 — PR autodetection
+### Phase 6 — PR autodetection ✅ (built 2026-07-08)
 
 At log time, compare each set against the user's historical best for that exercise (by weight, and separately by reps at a given weight). Visually highlight the set inline if it's a new PR. Persist `is_pr` on the set.
 **Done when**: logging a set that beats history is visibly flagged in the UI immediately, and the flag persists in history afterward.
+Notes: rules live in `src/lib/pr.ts` (shared client/server; replica in `scripts/demo-data.mjs` — keep in sync): one weight-PR per session (heaviest set beating history) plus rep-PRs only at previously-lifted weights (session-best reps beating the historical best there). Logger fetches per-exercise bests on selection and outlines a block **gold** with PR chips live; `saveWorkout` recomputes authoritatively and persists `is_pr`. Also added: focus highlight on the exercise block being edited, and a post-save summary page (`/history/[id]/summary`) with duration / total sets / volume count-up and a staggered gold-star PR animation.
 
 ### Phase 7 — Template builder
 

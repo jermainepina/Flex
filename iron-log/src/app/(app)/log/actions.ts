@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { collectBests, computePrFlags, type ExerciseBests } from "@/lib/pr";
 import { createClient } from "@/lib/supabase/server";
 import {
   MUSCLE_GROUPS,
@@ -74,6 +75,21 @@ export async function getPreviousPerformance(
   };
 }
 
+// Historical bests for one exercise — feeds the live gold-PR highlight in the
+// logger and the authoritative is_pr computation in saveWorkout.
+export async function getExerciseBests(
+  exerciseId: string,
+): Promise<ExerciseBests> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("sets")
+    .select("weight, reps, workout_exercises!inner(exercise_id)")
+    .eq("workout_exercises.exercise_id", exerciseId);
+  return collectBests(
+    (data ?? []).map((r) => ({ weightKg: r.weight, reps: r.reps })),
+  );
+}
+
 export type SetPayload = {
   weightKg: number;
   reps: number;
@@ -88,12 +104,20 @@ export type ExerciseEntryPayload = {
 export type WorkoutPayload = {
   date: string; // YYYY-MM-DD
   type: WorkoutType;
+  durationSeconds: number;
   exercises: ExerciseEntryPayload[];
 };
 
 function validate(payload: WorkoutPayload): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.date)) return "Invalid date.";
   if (!WORKOUT_TYPES.includes(payload.type)) return "Invalid workout type.";
+  if (
+    !Number.isFinite(payload.durationSeconds) ||
+    payload.durationSeconds < 0 ||
+    payload.durationSeconds > 24 * 3600
+  ) {
+    return "Invalid workout duration.";
+  }
   if (payload.exercises.length === 0) return "Add at least one exercise.";
 
   for (const entry of payload.exercises) {
@@ -113,7 +137,7 @@ function validate(payload: WorkoutPayload): string | null {
 
 export async function saveWorkout(
   payload: WorkoutPayload,
-): Promise<{ error?: string }> {
+): Promise<{ workoutId?: string; error?: string }> {
   const invalid = validate(payload);
   if (invalid) return { error: invalid };
 
@@ -123,6 +147,11 @@ export async function saveWorkout(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
 
+  // PR flags are computed against history BEFORE this workout is inserted.
+  const bestsPerEntry = await Promise.all(
+    payload.exercises.map((entry) => getExerciseBests(entry.exerciseId)),
+  );
+
   // Stored at noon UTC so the calendar day doesn't shift across timezones.
   const { data: workout, error: workoutError } = await supabase
     .from("workouts")
@@ -130,6 +159,7 @@ export async function saveWorkout(
       user_id: user.id,
       date: `${payload.date}T12:00:00Z`,
       type: payload.type,
+      duration_seconds: Math.round(payload.durationSeconds),
     })
     .select("id")
     .single();
@@ -161,14 +191,16 @@ export async function saveWorkout(
     return rollback(weError?.message ?? "Could not save exercises.");
   }
 
-  const setRows = payload.exercises.flatMap((entry, index) =>
-    entry.sets.map((set, setIndex) => ({
+  const setRows = payload.exercises.flatMap((entry, index) => {
+    const prFlags = computePrFlags(entry.sets, bestsPerEntry[index]);
+    return entry.sets.map((set, setIndex) => ({
       workout_exercise_id: workoutExercises[index].id,
       set_number: setIndex + 1,
       weight: set.weightKg,
       reps: set.reps,
-    })),
-  );
+      is_pr: prFlags[setIndex],
+    }));
+  });
 
   const { error: setsError } = await supabase.from("sets").insert(setRows);
   if (setsError) {
@@ -176,5 +208,5 @@ export async function saveWorkout(
   }
 
   revalidatePath("/dashboard");
-  return {};
+  return { workoutId: workout.id };
 }

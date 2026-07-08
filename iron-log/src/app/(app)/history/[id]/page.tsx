@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PrChip } from "@/components/pr-chip";
 import { createClient } from "@/lib/supabase/server";
 import {
   WORKOUT_TYPE_EMOJI,
@@ -17,7 +18,7 @@ type WorkoutDetail = {
     notes: string | null;
     position: number;
     exercises: { name: string } | null;
-    sets: { set_number: number; weight: number; reps: number }[];
+    sets: { set_number: number; weight: number; reps: number; is_pr: boolean }[];
   }[];
 };
 
@@ -37,7 +38,7 @@ export default async function WorkoutDetailPage({
     supabase
       .from("workouts")
       .select(
-        "id, date, type, workout_exercises(id, notes, position, exercises(name), sets(set_number, weight, reps))",
+        "id, date, type, workout_exercises(id, notes, position, exercises(name), sets(set_number, weight, reps, is_pr))",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -89,7 +90,7 @@ export default async function WorkoutDetailPage({
             <h2 className="font-medium">
               {entry.exercises?.name ?? "Unknown exercise"}
             </h2>
-            <div className="mt-3 grid grid-cols-[2.5rem_1fr_1fr] gap-x-2 gap-y-1 text-sm">
+            <div className="mt-3 grid grid-cols-[4rem_1fr_1fr] gap-x-2 gap-y-1 text-sm">
               <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                 Set
               </span>
@@ -101,11 +102,16 @@ export default async function WorkoutDetailPage({
               </span>
               {sets.map((s) => (
                 <div key={s.set_number} className="contents">
-                  <span className="text-zinc-500 dark:text-zinc-400">
+                  <span className="flex items-center gap-1 text-zinc-500 dark:text-zinc-400">
                     {s.set_number}
+                    {s.is_pr && <PrChip />}
                   </span>
-                  <span>{formatWeight(s.weight, unit)}</span>
-                  <span>{s.reps}</span>
+                  <span className={s.is_pr ? "font-medium text-amber-600 dark:text-amber-400" : ""}>
+                    {formatWeight(s.weight, unit)}
+                  </span>
+                  <span className={s.is_pr ? "font-medium text-amber-600 dark:text-amber-400" : ""}>
+                    {s.reps}
+                  </span>
                 </div>
               ))}
             </div>

@@ -49,6 +49,35 @@ function lcg(seed) {
   };
 }
 
+// Replica of computePrFlags in src/lib/pr.ts — keep in sync. One weight PR
+// per session (heaviest set beating history); rep PRs only at weights lifted
+// before this session (session-best reps beating the historical best there).
+export function computePrFlagsMjs(sets, bests) {
+  const flags = sets.map(() => false);
+  if (sets.length === 0) return flags;
+  const key = (w) => w.toFixed(3);
+
+  const sessionMax = Math.max(...sets.map((s) => s.weightKg));
+  if (sessionMax > bests.maxWeightKg) {
+    flags[sets.findIndex((s) => s.weightKg === sessionMax)] = true;
+  }
+
+  const byWeight = new Map();
+  sets.forEach((s, i) => {
+    const k = key(s.weightKg);
+    if (!(k in bests.repsAtWeight)) return;
+    if (byWeight.has(k)) byWeight.get(k).push(i);
+    else byWeight.set(k, [i]);
+  });
+  for (const [k, indices] of byWeight) {
+    const bestReps = Math.max(...indices.map((i) => sets[i].reps));
+    if (bestReps > bests.repsAtWeight[k]) {
+      flags[indices.find((i) => sets[i].reps === bestReps)] = true;
+    }
+  }
+  return flags;
+}
+
 const round5 = (lb) => Math.round(lb / 5) * 5;
 
 function isoAddDays(iso, days) {
@@ -73,6 +102,22 @@ export function generateDemoData(anchorDay) {
   const rand = lcg(0xf17e55);
   const lastMonday = mondayOf(anchorDay);
   const workouts = [];
+  // Running historical bests per exercise, so is_pr is chronological.
+  const bests = {};
+  const markPrs = (entries) => {
+    for (const entry of entries) {
+      const b = (bests[entry.exercise] ??= { maxWeightKg: 0, repsAtWeight: {} });
+      const flags = computePrFlagsMjs(entry.sets, b);
+      entry.sets.forEach((s, i) => {
+        s.isPr = flags[i];
+      });
+      for (const s of entry.sets) {
+        b.maxWeightKg = Math.max(b.maxWeightKg, s.weightKg);
+        const k = s.weightKg.toFixed(3);
+        b.repsAtWeight[k] = Math.max(b.repsAtWeight[k] ?? 0, s.reps);
+      }
+    }
+  };
 
   for (let week = 0; week < WEEKS; week++) {
     const monday = isoAddDays(lastMonday, -7 * (WEEKS - 1 - week));
@@ -112,12 +157,23 @@ export function generateDemoData(anchorDay) {
           sets,
         };
       });
-      workouts.push({ date: isoAddDays(monday, offset), type, entries });
+      markPrs(entries);
+      workouts.push({
+        date: isoAddDays(monday, offset),
+        type,
+        entries,
+        durationSeconds: 2700 + Math.floor(rand() * 1800), // 45–75 min
+      });
     }
 
     // Saturday cardio every other week — a workout with no strength entries.
     if (week % 2 === 0) {
-      workouts.push({ date: isoAddDays(monday, 5), type: "cardio", entries: [] });
+      workouts.push({
+        date: isoAddDays(monday, 5),
+        type: "cardio",
+        entries: [],
+        durationSeconds: 1500 + Math.floor(rand() * 900), // 25–40 min
+      });
     }
   }
 
