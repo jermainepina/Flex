@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { signOut } from "@/app/(auth)/actions";
+import { Dumbbell } from "lucide-react";
+import { NavBar } from "@/components/nav-bar";
 import { SetupNotice } from "@/components/setup-notice";
+import { TopNav } from "@/components/top-nav";
 import { createClient } from "@/lib/supabase/server";
 import { hasEnvVars } from "@/lib/utils";
 
@@ -17,58 +19,51 @@ export default async function AppLayout({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .maybeSingle();
+
+  const initials = (profile?.display_name || user.email || "?")
+    .trim()
+    .split(/\s+/)
+    .map((part: string) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
     <>
       <header className="border-b border-zinc-200 dark:border-zinc-800">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-3">
-          <nav className="flex items-center gap-5">
-            <Link href="/dashboard" className="font-semibold tracking-tight">
-              Iron Log
-            </Link>
-            <Link
-              href="/log"
-              className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="flex h-8 w-8 items-center justify-center rounded-lg"
+              style={{ background: "var(--accent)", color: "var(--accent-ink)" }}
             >
-              Log workout
-            </Link>
-            <Link
-              href="/history"
-              className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              History
-            </Link>
-            <Link
-              href="/templates"
-              className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              Templates
-            </Link>
-            <Link
-              href="/trends"
-              className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              Stats
-            </Link>
-          </nav>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-zinc-500 sm:inline dark:text-zinc-400">
-              {user.email}
+              <Dumbbell size={18} strokeWidth={2.5} />
             </span>
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
+            <span className="font-display text-lg uppercase tracking-tight">
+              Flexx
+            </span>
+          </Link>
+          <TopNav />
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            title={profile?.display_name || user.email || "Settings"}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold"
+            style={{ background: "var(--accent)", color: "var(--accent-ink)" }}
+          >
+            {initials}
+          </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 sm:pb-8">
         {children}
       </main>
+      <NavBar />
     </>
   );
 }

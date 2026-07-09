@@ -80,8 +80,9 @@ function today() {
   return new Date().toLocaleDateString("en-CA");
 }
 
+// text-base on mobile so iOS doesn't auto-zoom focused inputs
 const inputClass =
-  "rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700";
+  "rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base outline-none focus:border-(--accent) sm:text-sm dark:border-zinc-700";
 
 export function WorkoutLogger({
   initialExercises,
@@ -287,27 +288,30 @@ export function WorkoutLogger({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap gap-4">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Date
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={inputClass}
-          />
-        </label>
-        <label className="flex min-w-48 flex-1 flex-col gap-1 text-sm font-medium">
-          Name
-          <input
-            type="text"
-            placeholder="e.g. Push Day (optional)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={inputClass}
-          />
-        </label>
-      </div>
+      <section className="card flex flex-col gap-3 p-4">
+        <p className="label-mono">Session info</p>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Date
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-w-48 flex-1 flex-col gap-1 text-sm font-medium">
+            Workout name
+            <input
+              type="text"
+              placeholder="e.g. Push Day (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+        </div>
+      </section>
 
       {entries.map((entry, entryIndex) => {
         const prFlags = livePrFlags(entry);
@@ -315,15 +319,15 @@ export function WorkoutLogger({
         return (
         <section
           key={entry.key}
-          className={`flex flex-col gap-4 rounded-xl border p-4 transition-shadow ${
+          className={`card flex flex-col gap-4 p-4 transition-shadow ${
             hasPr
-              ? "border-amber-400 ring-2 ring-amber-400 dark:border-amber-500 dark:ring-amber-500"
-              : "border-zinc-200 focus-within:ring-2 focus-within:ring-zinc-400 dark:border-zinc-800 dark:focus-within:ring-zinc-500"
+              ? "ring-2 ring-amber-400 dark:ring-amber-500"
+              : "focus-within:ring-2 focus-within:ring-[var(--accent)]"
           }`}
         >
           <div className="flex items-end justify-between gap-3">
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">
-              Exercise {entryIndex + 1}
+            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm font-medium">
+              <span className="label-mono">Exercise {entryIndex + 1}</span>
               <select
                 value={entry.showNewInput ? NEW_EXERCISE : entry.exerciseId}
                 onChange={(e) => {
@@ -335,7 +339,7 @@ export function WorkoutLogger({
                     updateEntry(entry.key, { exerciseId: "", prev: null });
                   }
                 }}
-                className={inputClass}
+                className={`${inputClass} bg-white dark:bg-zinc-950`}
               >
                 <option value="">Select exercise…</option>
                 {exercises.map((ex) => (
@@ -392,7 +396,7 @@ export function WorkoutLogger({
                   })
                 }
                 aria-label="Muscle group"
-                className={inputClass}
+                className={`${inputClass} bg-white dark:bg-zinc-950`}
               >
                 {MUSCLE_GROUPS.map((g) => (
                   <option key={g} value={g}>
@@ -474,7 +478,7 @@ export function WorkoutLogger({
                   onClick={() => toggleDone(entry, setIndex)}
                   aria-label={`Mark set ${setIndex + 1} ${set.done ? "not done" : "done"}`}
                   aria-pressed={set.done}
-                  className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full border text-sm transition-colors ${
+                  className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full border text-sm transition-colors sm:h-8 sm:w-8 ${
                     set.done
                       ? "border-emerald-500 bg-emerald-500 text-white"
                       : "border-zinc-300 text-zinc-400 hover:border-emerald-500 hover:text-emerald-600 dark:border-zinc-700"
@@ -533,7 +537,7 @@ export function WorkoutLogger({
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+        className="btn-accent px-4 py-3.5 text-sm sm:py-3"
       >
         {saving ? "Saving…" : "Save workout"}
       </button>

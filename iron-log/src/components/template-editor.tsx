@@ -42,8 +42,9 @@ type EditorRow = {
 
 let nextKey = 0;
 
+// text-base on mobile so iOS doesn't auto-zoom focused inputs
 const inputClass =
-  "rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700";
+  "rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base outline-none focus:border-(--accent) sm:text-sm dark:border-zinc-700";
 
 export type TemplateEditorInitial = {
   id: string;
@@ -362,7 +363,7 @@ export function TemplateEditor({
             else if (e.target.value) addRow(e.target.value);
           }}
           aria-label="Add exercise"
-          className={inputClass}
+          className={`${inputClass} bg-white dark:bg-zinc-950`}
         >
           <option value="">+ Add exercise…</option>
           {exercises.map((ex) => (
@@ -399,7 +400,7 @@ export function TemplateEditor({
                 setNewGroupTouched(true);
               }}
               aria-label="Muscle group"
-              className={inputClass}
+              className={`${inputClass} bg-white dark:bg-zinc-950`}
             >
               {MUSCLE_GROUPS.map((g) => (
                 <option key={g} value={g}>
@@ -425,7 +426,7 @@ export function TemplateEditor({
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          className="btn-accent px-4 py-2.5 text-sm"
         >
           {saving ? "Saving…" : "Save template"}
         </button>

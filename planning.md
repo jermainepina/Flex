@@ -1,4 +1,6 @@
-# Iron Log — Project Context
+# Flexx (formerly Iron Log) — Project Context
+
+Product name is **Flexx** (renamed 2026-07-09 with the LIFTLOG-style redesign: electric-lime accent tokens, Archivo Black display headings, mono micro-labels, `.card`/`.btn-accent`/`.label-mono` classes in `globals.css`, desktop pill nav + avatar, mobile bottom tab bar). Folder/repo names remain `iron-log`/Flex.
 
 This file is context for Claude Code. Read it at the start of every session before making changes. Keep it updated as decisions change — this doc should always reflect the current state of the project, not the original plan.
 
@@ -27,8 +29,10 @@ Rough schema — adjust as needed, but keep this section in sync with reality.
 -- reference auth.users(id) as user_id in the tables below.
 
 profiles
-  id             uuid pk references auth.users   -- auto-created by trigger on signup
-  preferred_unit text default 'lb'               -- 'lb' | 'kg'; settings UI is a later phase
+  id             uuid pk references auth.users   -- auto-created by trigger on signup (copies display_name from signup metadata)
+  preferred_unit text default 'lb'               -- 'lb' | 'kg'; editable in /settings
+  display_name   text                            -- greeting + header (added 0006)
+  theme          text default 'dark'             -- 'light' | 'dim' | 'dark' (added 0006); class-based theming, server-rendered on <html>
   created_at     timestamptz default now()
 
 exercises
@@ -130,6 +134,10 @@ Notes: rules live in `src/lib/pr.ts` (shared client/server; replica in `scripts/
 Create and name workout templates. Drag-and-drop exercises to build/reorder a template. Starting a workout from a template pre-fills the exercise list (and can pre-fill workout type).
 **Done when**: a user can build a template, reorder it via drag-and-drop, and start a new workout pre-populated from it.
 Notes: `/templates` (list with Start/Edit/Delete) + `/templates/new` + `/templates/[id]` editor (`src/components/template-editor.tsx`, dnd-kit sortable with pointer + keyboard sensors). Templates store a per-exercise `target_sets` (migration `0004`): starting a workout pre-fills that many empty set rows per exercise, pre-selects type, and auto-loads prev/PR data; entry points are the template cards and a "Start from template" picker on `/log`. Saved workouts record `template_id` (verified against RLS before insert).
+
+### Pre-AI polish ✅ (built 2026-07-08)
+
+Refinements before phase 8: (a) workouts renamed from `type` enum to free-text `name` (migration 0005; blank → auto "Workout N"; calendar/history/dashboard show names, type columns legacy-fallback only); (b) template exercises carry `notes` + optional per-set `target_weights` (jsonb kg) that pre-fill the logger; (c) history defaults to calendar view; (d) template delete has an inline confirm; (e) **three selectable themes** — light / dim (slate) / dark (default) in `profiles.theme` (migration 0006), class-based Tailwind dark variant + `--color-zinc-*` overrides for dim, `color-scheme` fixes native select popups; (f) `/settings` page (display name, theme, unit, sign out — replaces header sign-out; sign-up has optional name); (g) **dashboard hub**: greeting, weekly stat tiles (workouts/volume/PRs vs last week), Start-workout CTA, AI-coach placeholder. Note: Apple Watch/HealthKit data is not accessible from web apps — would require a native iOS wrapper.
 
 ### Phase 8 — AI assistant
 

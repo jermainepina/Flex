@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
+/* Theme is a class on <html>, set server-side from profiles.theme:
+   ""              -> light
+   "dark"          -> dark (default)
+   "dark theme-dim" -> dim (slate-tinted middle theme; overrides the zinc
+                       variables Tailwind utilities resolve against) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
+  --background: #fafaf8;
   --foreground: #171717;
+  --surface: #ffffff;
+  color-scheme: light;
+  /* Brand accent (electric lime). Buttons keep the lime fill with dark ink
+     on every theme; accent-colored TEXT uses a darker step on light for
+     contrast. */
+  --accent: #ccf22f;
+  --accent-ink: #131600;
+  --accent-text: #4d7c0f;
+  --chart-accent: #65a30d;
   /* Chart tokens — categorical slots validated (dataviz) against both
      surfaces; slots map to muscle groups in fixed order, never reassigned */
   --chart-1: #2a78d6;
@@ -18,34 +34,98 @@
   --chart-cursor: rgba(0, 0, 0, 0.04);
 }
 
+.dark {
+  --background: #08090c;
+  --foreground: #ededed;
+  --surface: #101217;
+  /* color-scheme makes native widgets (select popups, date pickers) dark */
+  color-scheme: dark;
+  --accent: #ccf22f;
+  --accent-ink: #131600;
+  --accent-text: #ccf22f;
+  --chart-accent: #ccf22f;
+  --chart-1: #3987e5;
+  --chart-2: #199e70;
+  --chart-3: #c98500;
+  --chart-4: #008300;
+  --chart-5: #9085e9;
+  --chart-6: #e66767;
+  --chart-7: #d55181;
+  --chart-grid: #27272a;
+  --chart-axis: #3f3f46;
+  --chart-cursor: rgba(255, 255, 255, 0.06);
+}
+
+/* Dim: slate/blue-gray lift of the dark theme. Tailwind v4 utilities resolve
+   colors via var(--color-*), so overriding the zinc steps re-skins every
+   existing dark: utility without component changes. */
+.dark.theme-dim {
+  --background: #10161f;
+  --foreground: #e2e8f0;
+  --surface: #1a2230;
+  --color-zinc-950: #151c28;
+  --color-zinc-900: #1d2635;
+  --color-zinc-800: #2a3547;
+  --color-zinc-700: #3b4a61;
+  --color-zinc-400: #8fa0b5;
+  --color-zinc-300: #c0cbd9;
+  --chart-grid: #2a3547;
+  --chart-axis: #3b4a61;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --chart-1: #3987e5;
-    --chart-2: #199e70;
-    --chart-3: #c98500;
-    --chart-4: #008300;
-    --chart-5: #9085e9;
-    --chart-6: #e66767;
-    --chart-7: #d55181;
-    --chart-grid: #27272a;
-    --chart-axis: #3f3f46;
-    --chart-cursor: rgba(255, 255, 255, 0.06);
-  }
+  --font-display: var(--font-archivo);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* --- Flexx design-system pieces (kept as plain CSS so the sweep across
+       components stays mechanical) --- */
+
+/* Panel card */
+.card {
+  border-radius: 1rem;
+  border: 1px solid var(--color-zinc-200);
+  background: var(--surface);
+}
+.dark .card {
+  border-color: color-mix(in srgb, var(--color-zinc-800) 80%, transparent);
+}
+
+/* Primary action: lime fill, dark ink, blocky type */
+.btn-accent {
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.btn-accent:hover {
+  opacity: 0.85;
+}
+.btn-accent:disabled {
+  opacity: 0.5;
+}
+
+/* Mono uppercase micro-label */
+.label-mono {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-zinc-500);
+}
+.dark .label-mono {
+  color: var(--color-zinc-400);
 }
 
 /* Workout-summary PR stars */

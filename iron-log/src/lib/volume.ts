@@ -5,7 +5,7 @@
 
 import type { MuscleGroup } from "@/lib/types";
 
-export type Granularity = "weekly" | "monthly" | "yearly";
+export type Granularity = "daily" | "weekly" | "monthly" | "yearly";
 
 export type VolumeRow = { date: string; weightKg: number; reps: number };
 export type VolumeBucket = { bucket: string; label: string; totalKg: number };
@@ -25,16 +25,25 @@ export type GroupVolumeBucket = {
 export type ProgressionRate = { latestBestKg: number; ratePerWeekKg: number };
 
 export const BUCKET_CAPS: Record<Granularity, number> = {
+  daily: 62,
   weekly: 16,
   monthly: 12,
   yearly: 50,
 };
 
+/** Pick a readable bucket size for a custom date span. */
+export function granularityForSpan(days: number): Granularity {
+  if (days <= 31) return "daily";
+  if (days <= 180) return "weekly";
+  return "monthly";
+}
+
 const utcDay = (iso: string) => iso.slice(0, 10);
 
-/** weekly → Monday of that week (YYYY-MM-DD), monthly → YYYY-MM, yearly → YYYY. */
+/** daily → YYYY-MM-DD, weekly → Monday of that week, monthly → YYYY-MM, yearly → YYYY. */
 export function bucketKey(iso: string, granularity: Granularity): string {
   const day = utcDay(iso);
+  if (granularity === "daily") return day;
   if (granularity === "yearly") return day.slice(0, 4);
   if (granularity === "monthly") return day.slice(0, 7);
   const d = new Date(`${day}T00:00:00Z`);
@@ -50,12 +59,14 @@ function nextBucket(bucket: string, granularity: Granularity): string {
     return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7);
   }
   const d = new Date(`${bucket}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 7);
+  d.setUTCDate(d.getUTCDate() + (granularity === "daily" ? 1 : 7));
   return d.toISOString().slice(0, 10);
 }
 
 export function bucketLabel(bucket: string, granularity: Granularity): string {
   if (granularity === "yearly") return bucket;
+  // daily and weekly bucket keys are both YYYY-MM-DD and share the "Jul 4"
+  // label format (the weekly branch at the bottom handles both).
   if (granularity === "monthly") {
     const [y, m] = bucket.split("-").map(Number);
     return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", {

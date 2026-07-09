@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { workoutDisplayName, type WorkoutType } from "@/lib/types";
+import { nameColorVar, workoutDisplayName, type WorkoutType } from "@/lib/types";
 
 type HistoryWorkout = {
   id: string;
@@ -40,8 +40,8 @@ function formatDay(iso: string, opts: Intl.DateTimeFormatOptions) {
   });
 }
 
-const toggleBase = "rounded-md px-3 py-1.5 text-sm font-medium";
-const toggleOn = "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900";
+const toggleBase = "rounded-md px-3 py-1.5 text-sm font-semibold";
+const toggleOn = "bg-(--accent) text-(--accent-ink)";
 const toggleOff =
   "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800";
 
@@ -58,8 +58,15 @@ export default async function HistoryPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">History</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="label-mono">Training log</p>
+          <h1 className="font-display mt-1 text-3xl uppercase leading-[1.05] tracking-tight sm:text-4xl">
+            Your
+            <br />
+            <span style={{ color: "var(--accent-text)" }}>History</span>
+          </h1>
+        </div>
         <div className="flex gap-1 rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
           <Link
             href={`/history?month=${month}`}
@@ -132,8 +139,19 @@ async function ListView() {
                         month: "short",
                         day: "numeric",
                       })}
-                      <span className="truncate font-normal text-zinc-500 dark:text-zinc-400">
-                        {workoutDisplayName(w.name, w.type)}
+                      <span className="flex min-w-0 items-center gap-1.5 font-normal text-zinc-500 dark:text-zinc-400">
+                        <span
+                          aria-hidden
+                          className="inline-block h-2 w-2 shrink-0 rounded-full"
+                          style={{
+                            background: nameColorVar(
+                              workoutDisplayName(w.name, w.type),
+                            ),
+                          }}
+                        />
+                        <span className="truncate">
+                          {workoutDisplayName(w.name, w.type)}
+                        </span>
                       </span>
                     </span>
                     <span className="shrink-0 text-zinc-500 dark:text-zinc-400">
@@ -232,9 +250,14 @@ async function CalendarView({ month }: { month: string }) {
                     key={w.id}
                     href={`/history/${w.id}`}
                     title={label}
-                    className="block w-full truncate rounded bg-zinc-100 px-1 py-0.5 text-[10px] font-medium leading-tight text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                    className="flex w-full items-center gap-1 rounded bg-zinc-100 px-1 py-0.5 text-[10px] font-medium leading-tight text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                   >
-                    {label}
+                    <span
+                      aria-hidden
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: nameColorVar(label) }}
+                    />
+                    <span className="truncate">{label}</span>
                   </Link>
                 );
               })}

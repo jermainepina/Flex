@@ -47,20 +47,19 @@ export default async function WorkoutSummaryPage({
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
       <div className="text-center">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Workout saved 💪
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-          {workoutDisplayName(workout.name, workout.type)}
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {new Date(workout.date).toLocaleDateString(undefined, {
-            weekday: "long",
-            month: "long",
+        <p className="label-mono">
+          {workoutDisplayName(workout.name, workout.type)} ·{" "}
+          {new Date(workout.date).toLocaleDateString("en-US", {
+            month: "short",
             day: "numeric",
             timeZone: "UTC",
           })}
         </p>
+        <h1 className="font-display mt-1 text-3xl uppercase leading-[1.05] tracking-tight sm:text-4xl">
+          Workout
+          <br />
+          <span style={{ color: "var(--accent-text)" }}>Complete</span> 💪
+        </h1>
       </div>
 
       <SummaryStats
@@ -78,10 +77,7 @@ export default async function WorkoutSummaryPage({
         >
           View workout
         </Link>
-        <Link
-          href="/dashboard"
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
+        <Link href="/dashboard" className="btn-accent px-5 py-2.5 text-sm">
           Done
         </Link>
       </div>

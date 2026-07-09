@@ -98,7 +98,7 @@ export function LogSessionBar({
     : 0;
 
   return (
-    <div className="sticky bottom-0 -mx-6 border-t border-zinc-200 bg-white/95 px-6 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+    <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-4 border-t border-zinc-200 bg-white px-4 py-3 sm:bottom-0 sm:-mx-6 sm:px-6 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-center gap-4">
         <div className="flex flex-col">
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -123,7 +123,7 @@ export function LogSessionBar({
         <div className="h-1 min-w-8 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
           <div
             className="h-full rounded-full transition-[width] duration-300"
-            style={{ width: `${pct}%`, background: "var(--chart-1)" }}
+            style={{ width: `${pct}%`, background: "var(--chart-accent)" }}
           />
         </div>
 

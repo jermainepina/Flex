@@ -1,9 +1,10 @@
 "use client";
 
+import { useId } from "react";
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -30,7 +31,7 @@ function TrendTooltip({
   return (
     <ChartTooltipCard
       title={String(label)}
-      value={`${Number(payload[0].value ?? 0)} ${unit}`}
+      value={`${Number(payload[0].value ?? 0).toLocaleString("en-US")} ${unit}`}
     />
   );
 }
@@ -38,14 +39,25 @@ function TrendTooltip({
 export function ExerciseTrendChart({
   data,
   unit,
+  color = "var(--chart-1)",
 }: {
   data: TrendPoint[];
   unit: string;
+  color?: string;
 }) {
+  // Unique per instance so multiple charts on one page don't share defs.
+  const gradientId = useId().replace(/[^a-zA-Z0-9]/g, "");
+
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke="var(--chart-grid)"
@@ -69,15 +81,16 @@ export function ExerciseTrendChart({
             content={(props) => <TrendTooltip {...props} unit={unit} />}
             cursor={{ stroke: "var(--chart-axis)", strokeDasharray: "3 3" }}
           />
-          <Line
+          <Area
             type="monotone"
             dataKey="weight"
-            stroke="var(--chart-1)"
+            stroke={color}
             strokeWidth={2}
-            dot={{ r: 3, fill: "var(--chart-1)", strokeWidth: 0 }}
+            fill={`url(#${gradientId})`}
+            dot={{ r: 3, fill: color, strokeWidth: 0 }}
             activeDot={{ r: 6 }}
           />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

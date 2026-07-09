@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrChip } from "@/components/pr-chip";
 import { createClient } from "@/lib/supabase/server";
-import { workoutDisplayName, type WorkoutType } from "@/lib/types";
+import { nameColorVar, workoutDisplayName, type WorkoutType } from "@/lib/types";
 import { formatWeight, type WeightUnit } from "@/lib/units";
 
 type WorkoutDetail = {
@@ -24,11 +24,16 @@ const UUID_RE =
 
 export default async function WorkoutDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
   if (!UUID_RE.test(id)) notFound();
+  const backHref = from === "dashboard" ? "/dashboard" : "/history";
+  const backLabel = from === "dashboard" ? "Dashboard" : "History";
 
   const supabase = await createClient();
   const [{ data }, { data: profile }] = await Promise.all([
@@ -55,12 +60,21 @@ export default async function WorkoutDetailPage({
     <div className="flex flex-col gap-6">
       <div>
         <Link
-          href="/history"
+          href={backHref}
           className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
         >
-          ← History
+          ← {backLabel}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+        <h1 className="mt-2 flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          <span
+            aria-hidden
+            className="inline-block h-3 w-3 shrink-0 rounded-full"
+            style={{
+              background: nameColorVar(
+                workoutDisplayName(workout.name, workout.type),
+              ),
+            }}
+          />
           {workoutDisplayName(workout.name, workout.type)}
         </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
@@ -77,10 +91,7 @@ export default async function WorkoutDetailPage({
       {exercises.map((entry) => {
         const sets = [...entry.sets].sort((a, b) => a.set_number - b.set_number);
         return (
-          <section
-            key={entry.id}
-            className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-          >
+          <section key={entry.id} className="card p-4">
             <h2 className="font-medium">
               {entry.exercises?.name ?? "Unknown exercise"}
             </h2>

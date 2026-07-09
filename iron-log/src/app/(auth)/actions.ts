@@ -54,8 +54,14 @@ export async function signUp(
     return { error: "Password must be at least 6 characters." };
   }
 
+  const displayName = String(formData.get("name") ?? "").trim().slice(0, 50);
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    // Copied into profiles.display_name by the handle_new_user trigger.
+    options: { data: { display_name: displayName } },
+  });
   if (error) {
     return { error: error.message };
   }

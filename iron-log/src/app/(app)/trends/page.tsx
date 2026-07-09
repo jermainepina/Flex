@@ -7,6 +7,7 @@ import {
 import { VolumeChart } from "@/components/charts/volume-chart";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { LiftProgressGrid } from "@/components/lift-progress-grid";
+import { RangePicker } from "@/components/range-picker";
 import { createClient } from "@/lib/supabase/server";
 import {
   MUSCLE_GROUP_LABELS,
@@ -17,6 +18,7 @@ import {
 import { formatWeight, kgToUnit, type WeightUnit } from "@/lib/units";
 import {
   aggregateVolume,
+  granularityForSpan,
   muscleGroupWeeklyVolume,
   progressionRate,
   sessionBestSeries,
@@ -30,6 +32,19 @@ const RANGES: { key: Granularity; label: string }[] = [
   { key: "yearly", label: "Yearly" },
 ];
 
+type CustomRange = { from: string; to: string };
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isoAddDays(iso: string, days: number) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const defaultCustomTo = () => new Date().toISOString().slice(0, 10);
+const defaultCustomFrom = () => isoAddDays(defaultCustomTo(), -29);
+
 type WideSetRow = {
   weight: number;
   reps: number;
@@ -41,8 +56,8 @@ type WideSetRow = {
   };
 };
 
-const toggleBase = "rounded-md px-3 py-1.5 text-sm font-medium";
-const toggleOn = "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900";
+const toggleBase = "rounded-md px-3 py-1.5 text-sm font-semibold";
+const toggleOn = "bg-(--accent) text-(--accent-ink)";
 const toggleOff =
   "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800";
 
@@ -52,7 +67,13 @@ const emptyBox =
 export default async function TrendsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; range?: string; exercise?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    range?: string;
+    exercise?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
   const params = await searchParams;
   const tab = params.tab === "exercise" ? "exercise" : "overview";
@@ -61,6 +82,18 @@ export default async function TrendsPage({
   )
     ? (params.range as Granularity)
     : "weekly";
+
+  // Custom range: validated from/to, defaulting to the last 30 days.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  let custom: CustomRange | null = null;
+  if (params.range === "custom") {
+    custom =
+      DATE_RE.test(params.from ?? "") &&
+      DATE_RE.test(params.to ?? "") &&
+      (params.from as string) <= (params.to as string)
+        ? { from: params.from as string, to: params.to as string }
+        : { from: isoAddDays(todayIso, -29), to: todayIso };
+  }
 
   const supabase = await createClient();
   const [{ data: profile }, { data: wideRows }, { data: exerciseRows }] =
@@ -113,8 +146,15 @@ export default async function TrendsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Stats</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="label-mono">Analytics</p>
+          <h1 className="font-display mt-1 text-3xl uppercase leading-[1.05] tracking-tight sm:text-4xl">
+            Your
+            <br />
+            <span style={{ color: "var(--accent-text)" }}>Stats</span>
+          </h1>
+        </div>
         <div className="flex gap-1 rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
           <Link
             href="/trends"
@@ -136,6 +176,7 @@ export default async function TrendsPage({
           rows={rows}
           hasAnyData={hasAnyData}
           range={range}
+          custom={custom}
           unit={unit}
           lifts={lifts}
         />
@@ -155,22 +196,41 @@ function OverviewTab({
   rows,
   hasAnyData,
   range,
+  custom,
   unit,
   lifts,
 }: {
   rows: WideSetRow[];
   hasAnyData: boolean;
   range: Granularity;
+  custom: CustomRange | null;
   unit: WeightUnit;
   lifts: { id: string; name: string; rate: ReturnType<typeof progressionRate> }[];
 }) {
+  // Custom range filters to [from, to] and picks a bucket size for the span;
+  // preset ranges keep their standard caps.
+  let volumeRows = rows.map((r) => ({
+    date: r.workout_exercises.workouts.date,
+    weightKg: r.weight,
+    reps: r.reps,
+  }));
+  let granularity = range;
+  if (custom) {
+    const spanDays =
+      (Date.parse(`${custom.to}T00:00:00Z`) -
+        Date.parse(`${custom.from}T00:00:00Z`)) /
+        86400000 +
+      1;
+    granularity = granularityForSpan(spanDays);
+    volumeRows = volumeRows.filter((r) => {
+      const day = r.date.slice(0, 10);
+      return day >= custom.from && day <= custom.to;
+    });
+  }
   const volumeData = aggregateVolume(
-    rows.map((r) => ({
-      date: r.workout_exercises.workouts.date,
-      weightKg: r.weight,
-      reps: r.reps,
-    })),
-    range,
+    volumeRows,
+    granularity,
+    custom ? 200 : undefined,
   ).map((b) => ({ label: b.label, volume: Math.round(kgToUnit(b.totalKg, unit)) }));
 
   const groupBuckets = muscleGroupWeeklyVolume(
@@ -237,20 +297,31 @@ function OverviewTab({
               (weight × reps, {unit})
             </span>
           </h2>
-          <div className="flex gap-1 rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
+          <div className="flex flex-wrap gap-1 rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
             {RANGES.map((r) => (
               <Link
                 key={r.key}
                 href={`/trends?range=${r.key}`}
-                className={`${toggleBase} ${range === r.key ? toggleOn : toggleOff}`}
+                className={`${toggleBase} ${!custom && range === r.key ? toggleOn : toggleOff}`}
               >
                 {r.label}
               </Link>
             ))}
+            <Link
+              href={`/trends?range=custom&from=${custom?.from ?? defaultCustomFrom()}&to=${custom?.to ?? defaultCustomTo()}`}
+              className={`${toggleBase} ${custom ? toggleOn : toggleOff}`}
+            >
+              Custom
+            </Link>
           </div>
         </div>
+        {custom && <RangePicker from={custom.from} to={custom.to} />}
         {hasAnyData ? (
-          <VolumeChart data={volumeData} unit={unit} />
+          volumeData.length > 0 ? (
+            <VolumeChart data={volumeData} unit={unit} />
+          ) : (
+            <p className={emptyBox}>No workouts in this range.</p>
+          )
         ) : (
           <p className={emptyBox}>No data yet.</p>
         )}

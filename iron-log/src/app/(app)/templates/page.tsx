@@ -22,13 +22,17 @@ export default async function TemplatesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
-        <Link
-          href="/templates/new"
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          New template
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="label-mono">Reusable workouts</p>
+          <h1 className="font-display mt-1 text-3xl uppercase leading-[1.05] tracking-tight sm:text-4xl">
+            My
+            <br />
+            <span style={{ color: "var(--accent-text)" }}>Templates</span>
+          </h1>
+        </div>
+        <Link href="/templates/new" className="btn-accent px-4 py-2.5 text-sm">
+          + New template
         </Link>
       </div>
 
@@ -44,10 +48,7 @@ export default async function TemplatesPage() {
               (a, b) => a.position - b.position,
             );
             return (
-              <div
-                key={t.id}
-                className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-              >
+              <div key={t.id} className="card flex flex-col gap-3 p-4">
                 <div>
                   <p className="font-medium">{t.name}</p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -69,7 +70,7 @@ export default async function TemplatesPage() {
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/log?template=${t.id}`}
-                    className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                    className="btn-accent px-3 py-2 text-xs"
                   >
                     Start workout
                   </Link>

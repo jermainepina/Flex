@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { TemplatePicker } from "@/components/template-picker";
 import { WorkoutLogger, type InitialTemplate } from "@/components/workout-logger";
 import { createClient } from "@/lib/supabase/server";
@@ -68,15 +69,23 @@ export default async function LogPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Log workout</h1>
-        {(templates ?? []).length > 0 && (
-          <TemplatePicker
-            templates={templates ?? []}
-            selectedId={initialTemplate?.id ?? null}
-          />
-        )}
-      </div>
+      <PageHeader
+        kicker={new Date().toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        })}
+        titleA="Log"
+        titleB="Workout"
+        action={
+          (templates ?? []).length > 0 ? (
+            <TemplatePicker
+              templates={templates ?? []}
+              selectedId={initialTemplate?.id ?? null}
+            />
+          ) : undefined
+        }
+      />
       <WorkoutLogger
         key={initialTemplate?.id ?? "blank"}
         initialExercises={exercises ?? []}

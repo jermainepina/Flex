@@ -23,13 +23,33 @@ export function AuthForm({
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 className="text-xl font-semibold tracking-tight">Iron Log</h1>
+      <div className="card w-full max-w-sm p-8 shadow-sm">
+        <p className="label-mono">
+          {isSignIn ? "Welcome back" : "Get started"}
+        </p>
+        <h1 className="font-display mt-1 text-3xl uppercase tracking-tight">
+          Fle<span style={{ color: "var(--accent-text)" }}>xx</span>
+        </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           {isSignIn ? "Sign in to your account" : "Create an account"}
         </p>
 
         <form action={formAction} className="mt-6 flex flex-col gap-4">
+          {!isSignIn && (
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Name{" "}
+              <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                (optional)
+              </span>
+              <input
+                type="text"
+                name="name"
+                maxLength={50}
+                autoComplete="name"
+                className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base outline-none focus:border-(--accent) sm:text-sm dark:border-zinc-700"
+              />
+            </label>
+          )}
           <label className="flex flex-col gap-1 text-sm font-medium">
             Email
             <input
@@ -37,7 +57,7 @@ export function AuthForm({
               name="email"
               required
               autoComplete="email"
-              className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
+              className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base outline-none focus:border-(--accent) sm:text-sm dark:border-zinc-700"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -48,7 +68,7 @@ export function AuthForm({
               required
               minLength={6}
               autoComplete={isSignIn ? "current-password" : "new-password"}
-              className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
+              className="rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base outline-none focus:border-(--accent) sm:text-sm dark:border-zinc-700"
             />
           </label>
 
@@ -64,7 +84,7 @@ export function AuthForm({
           <button
             type="submit"
             disabled={pending}
-            className="mt-2 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="btn-accent mt-2 px-3 py-2.5 text-sm"
           >
             {pending ? "Please wait…" : isSignIn ? "Sign in" : "Sign up"}
           </button>

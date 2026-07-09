@@ -57,7 +57,14 @@ export default async function EditTemplatePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Edit template</h1>
+      <div>
+        <p className="label-mono">Template builder</p>
+        <h1 className="font-display mt-1 text-3xl uppercase leading-[1.05] tracking-tight sm:text-4xl">
+          Edit
+          <br />
+          <span style={{ color: "var(--accent-text)" }}>Template</span>
+        </h1>
+      </div>
       <TemplateEditor
         exercises={(exercises ?? []) as Exercise[]}
         unit={unit}

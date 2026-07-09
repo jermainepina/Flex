@@ -93,6 +93,21 @@ export function guessMuscleGroup(name: string): MuscleGroup {
   return "other";
 }
 
+export const THEMES = ["light", "dim", "dark"] as const;
+export type Theme = (typeof THEMES)[number];
+
+/**
+ * Stable accent color for a workout name: hashes the name onto the seven
+ * validated chart slots, so "Push Day" is always the same color everywhere.
+ */
+export function nameColorVar(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (Math.imul(hash, 31) + name.charCodeAt(i)) | 0;
+  }
+  return `var(--chart-${(Math.abs(hash) % 7) + 1})`;
+}
+
 export type Exercise = {
   id: string;
   name: string;

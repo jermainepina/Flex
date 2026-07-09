@@ -38,11 +38,9 @@ function formatDuration(totalSeconds: number) {
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
-        {value}
-      </p>
+    <div className="card p-4">
+      <p className="label-mono">{label}</p>
+      <p className="font-display mt-1.5 text-2xl tabular-nums">{value}</p>
       {sub && <p className="text-xs text-zinc-500 dark:text-zinc-400">{sub}</p>}
     </div>
   );

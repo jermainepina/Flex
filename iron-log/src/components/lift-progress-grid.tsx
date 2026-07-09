@@ -21,14 +21,11 @@ export function LiftProgressGrid({ cards }: { cards: LiftCard[] }) {
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-3">
         {visible.map((lift) => (
-          <div
-            key={lift.id}
-            className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-          >
+          <div key={lift.id} className="card p-4">
             <p className="truncate text-sm font-medium">{lift.name}</p>
             {lift.best ? (
               <>
-                <p className="mt-2 text-2xl font-semibold tracking-tight">
+                <p className="font-display mt-2 text-2xl">
                   {lift.best}
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">

@@ -71,7 +71,7 @@ export function VolumeChart({
           />
           <Bar
             dataKey="volume"
-            fill="var(--chart-1)"
+            fill="var(--chart-accent)"
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
           />
