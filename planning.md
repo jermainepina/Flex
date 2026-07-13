@@ -133,11 +133,15 @@ Notes: rules live in `src/lib/pr.ts` (shared client/server; replica in `scripts/
 
 Create and name workout templates. Drag-and-drop exercises to build/reorder a template. Starting a workout from a template pre-fills the exercise list (and can pre-fill workout type).
 **Done when**: a user can build a template, reorder it via drag-and-drop, and start a new workout pre-populated from it.
-Notes: `/templates` (list with Start/Edit/Delete) + `/templates/new` + `/templates/[id]` editor (`src/components/template-editor.tsx`, dnd-kit sortable with pointer + keyboard sensors). Templates store a per-exercise `target_sets` (migration `0004`): starting a workout pre-fills that many empty set rows per exercise, pre-selects type, and auto-loads prev/PR data; entry points are the template cards and a "Start from template" picker on `/log`. Saved workouts record `template_id` (verified against RLS before insert).
+Notes: `/templates` (list with Start/Edit/Delete) + `/templates/new` + `/templates/[id]` editor (`src/components/template-editor.tsx`, dnd-kit sortable with pointer + keyboard sensors). Templates store a per-exercise `target_sets` (migration `0004`): starting a workout pre-fills that many empty set rows per exercise, pre-selects type, and auto-loads prev/PR data; entry points are the template cards and the template select on the `/log` start page (originally a header picker; moved 2026-07-10). Saved workouts record `template_id` (verified against RLS before insert).
 
 ### Pre-AI polish ✅ (built 2026-07-08)
 
 Refinements before phase 8: (a) workouts renamed from `type` enum to free-text `name` (migration 0005; blank → auto "Workout N"; calendar/history/dashboard show names, type columns legacy-fallback only); (b) template exercises carry `notes` + optional per-set `target_weights` (jsonb kg) that pre-fill the logger; (c) history defaults to calendar view; (d) template delete has an inline confirm; (e) **three selectable themes** — light / dim (slate) / dark (default) in `profiles.theme` (migration 0006), class-based Tailwind dark variant + `--color-zinc-*` overrides for dim, `color-scheme` fixes native select popups; (f) `/settings` page (display name, theme, unit, sign out — replaces header sign-out; sign-up has optional name); (g) **dashboard hub**: greeting, weekly stat tiles (workouts/volume/PRs vs last week), Start-workout CTA, AI-coach placeholder. Note: Apple Watch/HealthKit data is not accessible from web apps — would require a native iOS wrapper.
+
+### Log start page ✅ (built 2026-07-10)
+
+The Log tab no longer opens straight into the logging interface. `/log` is now a **start page** (`src/components/log-start-form.tsx`): optional template select (template-card links `/log?template=<id>` preselect it), date, optional workout name, and rest-timer preset pills (writes the same localStorage store the session bar reads). "Start workout" plays a lime full-screen "LET'S GO" launch animation (skipped under `prefers-reduced-motion`) then navigates to **`/log/active`** — the moved logger route, which accepts `?template&date&name`. In-session, an **Exit** button next to Save (inline Discard? Yes/No confirm) returns to the start page; entered sets are dropped. The old header `TemplatePicker` component was removed.
 
 ### Phase 8 — AI assistant
 

@@ -143,3 +143,27 @@ body {
     opacity: 1;
   }
 }
+
+/* Log start page launch overlay */
+@keyframes go-overlay {
+  0% {
+    clip-path: circle(0% at 50% 70%);
+  }
+  100% {
+    clip-path: circle(150% at 50% 70%);
+  }
+}
+@keyframes go-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

@@ -9,20 +9,26 @@ import {
   type Ref,
 } from "react";
 
-const PRESETS = [60, 90, 120, 180];
+export const PRESETS = [60, 90, 120, 180];
+// Sane bounds for a custom rest duration (5s to 10min).
+export const CUSTOM_MIN = 5;
+export const CUSTOM_MAX = 600;
 const STORAGE_KEY = "ironlog-rest-seconds";
 
 // Tiny external store for the rest-duration preset so render reads it via
-// useSyncExternalStore (localStorage isn't readable during render).
+// useSyncExternalStore (localStorage isn't readable during render). Shared
+// with the log start page, which sets the preset (or a custom value) before
+// the session begins.
 const listeners = new Set<() => void>();
-const durationStore = {
+export const durationStore = {
   get(): number {
     if (typeof window === "undefined") return 90;
     const v = Number(window.localStorage.getItem(STORAGE_KEY));
-    return PRESETS.includes(v) ? v : 90;
+    return Number.isFinite(v) && v >= CUSTOM_MIN && v <= CUSTOM_MAX ? v : 90;
   },
   set(v: number) {
-    window.localStorage.setItem(STORAGE_KEY, String(v));
+    if (!Number.isFinite(v) || v < CUSTOM_MIN || v > CUSTOM_MAX) return;
+    window.localStorage.setItem(STORAGE_KEY, String(Math.round(v)));
     listeners.forEach((l) => l());
   },
   subscribe(cb: () => void) {
@@ -133,11 +139,13 @@ export function LogSessionBar({
           aria-label="Rest duration"
           className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700 dark:bg-zinc-950"
         >
-          {PRESETS.map((p) => (
-            <option key={p} value={p}>
-              {p}s
-            </option>
-          ))}
+          {[...new Set([...PRESETS, duration])]
+            .sort((a, b) => a - b)
+            .map((p) => (
+              <option key={p} value={p}>
+                {p}s
+              </option>
+            ))}
         </select>
         <button
           type="button"

@@ -80,18 +80,30 @@ function today() {
   return new Date().toLocaleDateString("en-CA");
 }
 
-// text-base on mobile so iOS doesn't auto-zoom focused inputs
+// text-base on mobile so iOS doesn't auto-zoom focused inputs. min-w-0
+// matters in the sets grid below: without it a number input's intrinsic
+// width refuses to shrink inside its 1fr track, blowing the row out past
+// the viewport on narrow phones instead of fitting it.
 const inputClass =
-  "rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base outline-none focus:border-(--accent) sm:text-sm dark:border-zinc-700";
+  "min-w-0 rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-base outline-none focus:border-(--accent) sm:text-sm dark:border-zinc-700";
+
+// Set-row grid: tighter fixed columns + gap on phones so Weight/Reps have
+// room to breathe; widens back out at sm.
+const setGridClass =
+  "grid grid-cols-[2.75rem_1fr_1fr_2.25rem_1.5rem] items-center gap-1.5 sm:grid-cols-[4rem_1fr_1fr_2.5rem_2.5rem] sm:gap-2";
 
 export function WorkoutLogger({
   initialExercises,
   unit,
   initialTemplate = null,
+  initialDate,
+  initialName,
 }: {
   initialExercises: Exercise[];
   unit: WeightUnit;
   initialTemplate?: InitialTemplate | null;
+  initialDate?: string;
+  initialName?: string;
 }) {
   const router = useRouter();
   const [exercises, setExercises] = useState(initialExercises);
@@ -109,9 +121,10 @@ export function WorkoutLogger({
         )
       : [makeEntry()],
   );
-  const [date, setDate] = useState(today);
-  const [name, setName] = useState(initialTemplate?.name ?? "");
+  const [date, setDate] = useState(initialDate ?? today);
+  const [name, setName] = useState(initialName ?? initialTemplate?.name ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [confirmExit, setConfirmExit] = useState(false);
   const [saving, startSaving] = useTransition();
   // Session start is captured in an effect (render must stay pure); the bar
   // owns the visible clocks and exposes startRest() for the done checkmarks.
@@ -435,19 +448,18 @@ export function WorkoutLogger({
           )}
 
           <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-[4rem_1fr_1fr_2.5rem_2.5rem] items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            <div
+              className={`${setGridClass} text-xs font-medium text-zinc-500 dark:text-zinc-400`}
+            >
               <span>Set</span>
-              <span>Weight ({unit})</span>
+              <span className="truncate">Weight ({unit})</span>
               <span>Reps</span>
               <span className="text-center">Done</span>
               <span />
             </div>
             {entry.sets.map((set, setIndex) => (
-              <div
-                key={setIndex}
-                className="grid grid-cols-[4rem_1fr_1fr_2.5rem_2.5rem] items-center gap-2"
-              >
-                <span className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400">
+              <div key={setIndex} className={setGridClass}>
+                <span className="flex flex-wrap items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400">
                   {setIndex + 1}
                   {prFlags[setIndex] && <PrChip />}
                 </span>
@@ -533,14 +545,67 @@ export function WorkoutLogger({
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saving}
-        className="btn-accent px-4 py-3.5 text-sm sm:py-3"
-      >
-        {saving ? "Saving…" : "Save workout"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="btn-accent min-w-40 flex-1 px-4 py-3.5 text-sm sm:py-3"
+        >
+          {saving ? "Saving…" : "Save workout"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmExit(true)}
+          disabled={saving}
+          className="rounded-md border border-zinc-300 px-4 py-3.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-40 sm:py-3 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        >
+          Exit
+        </button>
+      </div>
+
+      {confirmExit && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="discard-title"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          onClick={() => setConfirmExit(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="card flex w-full max-w-sm flex-col gap-4 p-5"
+          >
+            <div className="flex flex-col gap-1">
+              <p id="discard-title" className="text-base font-semibold">
+                Discard this workout?
+              </p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Your logged sets haven&rsquo;t been saved. This can&rsquo;t be undone.
+              </p>
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmExit(false)}
+                className="rounded-md border border-zinc-300 px-4 py-2.5 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                Keep logging
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/log");
+                  router.refresh();
+                }}
+                className="rounded-md bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Discard workout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <LogSessionBar handleRef={barRef} />
     </div>
