@@ -144,6 +144,29 @@ body {
   }
 }
 
+/* Goal-completion celebration */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+@keyframes goal-strike {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
 /* Log start page launch overlay */
 @keyframes go-overlay {
   0% {

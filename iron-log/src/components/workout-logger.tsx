@@ -7,8 +7,10 @@ import {
   getExerciseBests,
   getPreviousPerformance,
   saveWorkout,
+  type CompletedGoal,
   type WorkoutPayload,
 } from "@/app/(app)/log/actions";
+import { GoalCelebration } from "@/components/goal-celebration";
 import { PrChip } from "@/components/pr-chip";
 import { LogSessionBar, type LogSessionBarHandle } from "@/components/rest-timer";
 import { computePrFlags, type ExerciseBests } from "@/lib/pr";
@@ -125,6 +127,10 @@ export function WorkoutLogger({
   const [name, setName] = useState(initialName ?? initialTemplate?.name ?? "");
   const [error, setError] = useState<string | null>(null);
   const [confirmExit, setConfirmExit] = useState(false);
+  const [celebration, setCelebration] = useState<{
+    goals: CompletedGoal[];
+    workoutId: string;
+  } | null>(null);
   const [saving, startSaving] = useTransition();
   // Session start is captured in an effect (render must stay pure); the bar
   // owns the visible clocks and exposes startRest() for the done checkmarks.
@@ -292,6 +298,14 @@ export function WorkoutLogger({
       const result = await saveWorkout(payload);
       if (result.error || !result.workoutId) {
         setError(result.error ?? "Could not save workout.");
+        return;
+      }
+      if (result.completedGoals && result.completedGoals.length > 0) {
+        // Celebrate first; Continue proceeds to the summary.
+        setCelebration({
+          goals: result.completedGoals,
+          workoutId: result.workoutId,
+        });
         return;
       }
       router.push(`/history/${result.workoutId}/summary`);
@@ -605,6 +619,16 @@ export function WorkoutLogger({
             </div>
           </div>
         </div>
+      )}
+
+      {celebration && (
+        <GoalCelebration
+          goals={celebration.goals}
+          onContinue={() => {
+            router.push(`/history/${celebration.workoutId}/summary`);
+            router.refresh();
+          }}
+        />
       )}
 
       <LogSessionBar handleRef={barRef} />

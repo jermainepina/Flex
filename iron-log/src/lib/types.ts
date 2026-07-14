@@ -93,6 +93,19 @@ export function guessMuscleGroup(name: string): MuscleGroup {
   return "other";
 }
 
+// Cardio kinds are presentation-only: the chosen kind becomes the workout's
+// default name (workouts.type = 'cardio' marks the session itself).
+export const CARDIO_KINDS = [
+  "Running",
+  "Treadmill",
+  "Stairmaster",
+  "Cycling",
+  "Rowing",
+  "Elliptical",
+  "Swimming",
+  "Other cardio",
+] as const;
+
 export const THEMES = ["light", "dim", "dark"] as const;
 export type Theme = (typeof THEMES)[number];
 

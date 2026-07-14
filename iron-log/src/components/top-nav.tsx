@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const TABS = [
+const TABS: { href: string; label: string; also?: string }[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/log", label: "Log" },
-  { href: "/history", label: "History" },
+  // Progress = merged History + Stats section (both routes highlight it).
+  { href: "/history", label: "Progress", also: "/trends" },
+  { href: "/goals", label: "Goals" },
   { href: "/templates", label: "Templates" },
-  { href: "/trends", label: "Stats" },
 ];
 
 /** Desktop pill nav (hidden on mobile where the bottom tab bar takes over). */
@@ -23,7 +24,8 @@ export function TopNav() {
         const active =
           tab.href === "/dashboard"
             ? pathname === "/dashboard"
-            : pathname.startsWith(tab.href);
+            : pathname.startsWith(tab.href) ||
+              (tab.also !== undefined && pathname.startsWith(tab.also));
         return (
           <Link
             key={tab.href}

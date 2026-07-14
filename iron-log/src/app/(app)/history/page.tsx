@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProgressSwitcher } from "@/components/progress-switcher";
 import { createClient } from "@/lib/supabase/server";
 import { nameColorVar, workoutDisplayName, type WorkoutType } from "@/lib/types";
 
@@ -58,6 +59,7 @@ export default async function HistoryPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <ProgressSwitcher active="history" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="label-mono">Training log</p>

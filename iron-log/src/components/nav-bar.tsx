@@ -3,19 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CalendarDays,
   ChartLine,
   ClipboardList,
   House,
   Plus,
+  Target,
 } from "lucide-react";
 
 const TABS = [
   { href: "/dashboard", label: "Home", Icon: House },
-  { href: "/history", label: "History", Icon: CalendarDays },
+  // Progress = merged History + Stats section (both routes highlight it).
+  { href: "/history", label: "Progress", Icon: ChartLine, also: "/trends" },
   { href: "/log", label: "Log", Icon: Plus },
+  { href: "/goals", label: "Goals", Icon: Target },
   { href: "/templates", label: "Templates", Icon: ClipboardList },
-  { href: "/trends", label: "Stats", Icon: ChartLine },
 ];
 
 /** Mobile bottom tab bar (hidden on sm+ where the pill nav shows). */
@@ -28,11 +29,12 @@ export function NavBar() {
       className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden dark:border-zinc-800 dark:bg-zinc-950"
     >
       <div className="grid h-16 grid-cols-5">
-        {TABS.map(({ href, label, Icon }) => {
+        {TABS.map(({ href, label, Icon, also }) => {
           const active =
             href === "/dashboard"
               ? pathname === "/dashboard"
-              : pathname.startsWith(href);
+              : pathname.startsWith(href) ||
+                (also !== undefined && pathname.startsWith(also));
           const isLog = href === "/log";
           return (
             <Link

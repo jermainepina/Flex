@@ -6,7 +6,7 @@ This file is context for Claude Code. Read it at the start of every session befo
 
 ## What this is
 
-A multi-user web app for logging gym workouts and tracking progress over time. Users sign in, log exercises with sets/reps/weight, see their history, track volume trends, build reusable workout templates, and (eventually) get AI-generated performance insights.
+A multi-user web app for logging gym workouts and tracking progress over time. Users sign in, log exercises with sets/reps/weight, see their history, track volume trends, and build reusable workout templates.
 
 ## Stack
 
@@ -16,7 +16,6 @@ A multi-user web app for logging gym workouts and tracking progress over time. U
 - **Charts**: Recharts
 - **Drag-and-drop**: dnd-kit
 - **Hosting**: Vercel (app), Supabase (DB)
-- **AI assistant (phase 8)**: Claude API, fed pre-aggregated stats computed server-side — never raw table dumps
 
 Why Supabase over Firebase: the data is inherently relational (sets belong to exercises belong to workouts; templates belong to users and reference exercises), so Postgres is a better fit than a document store. Row-level security also means per-user data isolation is enforced at the DB layer, not hand-rolled in application code.
 
@@ -143,10 +142,16 @@ Refinements before phase 8: (a) workouts renamed from `type` enum to free-text `
 
 The Log tab no longer opens straight into the logging interface. `/log` is now a **start page** (`src/components/log-start-form.tsx`): optional template select (template-card links `/log?template=<id>` preselect it), date, optional workout name, and rest-timer preset pills (writes the same localStorage store the session bar reads). "Start workout" plays a lime full-screen "LET'S GO" launch animation (skipped under `prefers-reduced-motion`) then navigates to **`/log/active`** — the moved logger route, which accepts `?template&date&name`. In-session, an **Exit** button next to Save (inline Discard? Yes/No confirm) returns to the start page; entered sets are dropped. The old header `TemplatePicker` component was removed.
 
-### Phase 8 — AI assistant
+### AI assistant — built, then removed (2026-07-13)
 
-Aggregate a user's recent performance server-side (volume trends, PRs, frequency, muscle group balance) and send that summary — not raw logs — to the Claude API. Returns weekly/monthly performance summaries and suggested workouts, exercises, or splits.
-**Done when**: a user can request an assessment and get a coherent, data-grounded summary and suggestion back.
+A Claude-, then Gemini-powered coach was built (aggregation module, cache table, server actions, dashboard card), live-verified, then fully descoped at the user's request the same day. All app-side code and the `@google/genai` dependency were removed; the migration file was deleted too, but the live Supabase `ai_insights` table it created still needs a manual `drop table if exists public.ai_insights;` in the SQL editor to fully clean up (anon key can't run DDL). No AI feature is currently planned. If this comes back, decide the provider/model fresh rather than reusing this round's choices — model IDs and availability shift fast (this attempt hit two dead/quota-zero model IDs before finding one that worked).
+
+### Goals + cardio + Progress merge (built 2026-07-14)
+
+Post-roadmap phase. Three parts:
+1. **Goals tab** (`/goals`, migration `0007_goals.sql`): `goals` table (`metric` enum sessions/volume/exercise_weight/cardio_minutes, `period` enum weekly/monthly — null for standing exercise-weight targets, `target` numeric canonical count/kg/minutes, optional `exercise_id`, RLS owner-only). Pure progress math in `src/lib/goals.ts` (`computeGoalProgress`, `goalLabel` — fixture-tested via `scripts/verify-goals.mjs`); create/delete server actions; goal cards with `CircularStat` rings + achieved (lime ring) state. The dashboard's **main card** (full width, top of page) is the goal tracker: every goal stacked vertically with its progress ring + current/target; empty state is a full card linking to `/goals` ("Add a goal →"). Latest-PR info lives as a caption line in the Best lifts card. The training-days heatmap's week columns flex to fill the card width (large dots). **Completion celebration**: when a saved workout (lifting or cardio) pushes a goal over its target, a full-screen overlay fires first (confetti + "GOAL CRUSHED" + goal labels crossed off with staggered strike-through, `goal-celebration.tsx`, `confetti-fall`/`goal-strike` keyframes) with a Continue button onward to the summary/detail page; detection = `newlyCompletedGoals` in `lib/goals.ts` (progress with vs without the new workout's rows, computed fail-soft in `findCompletedGoals` inside `log/actions.ts` — already-achieved goals never re-fire).
+2. **Cardio logging mode**: the `/log` start page has a Lifting | Cardio toggle. Cardio mode: kind select (`CARDIO_KINDS` in types.ts — Running/Treadmill/etc., becomes the default session name), date, and a session-length picker (15/20/30/45/60 min presets + custom 5–600). START → `/log/cardio` — a big countdown ring (elapsed vs target, overtime counts up past zero in green), ±5 min mid-session target adjustment, Finish & save / Exit (discard confirm). `saveCardio` in `log/actions.ts` inserts a workout with **`type='cardio'`** (the type enum is no longer legacy-only), a duration, and no exercises — history/calendar render zero-exercise workouts fine, and cardio-minutes goals measure exactly these rows.
+3. **Nav merge**: History + Stats became one **Progress** section (tab → `/history`, highlighted for `/trends` too, `ChartLine` icon) with a History | Stats segmented switcher (`progress-switcher.tsx`) on both pages; **Goals** (`Target` icon) took the freed 5th slot in both the mobile bottom bar and desktop pill nav. All routes/deep links unchanged.
 
 ## Working conventions
 

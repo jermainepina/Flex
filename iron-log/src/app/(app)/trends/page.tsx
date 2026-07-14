@@ -7,6 +7,7 @@ import {
 import { VolumeChart } from "@/components/charts/volume-chart";
 import { ExercisePicker } from "@/components/exercise-picker";
 import { LiftProgressGrid } from "@/components/lift-progress-grid";
+import { ProgressSwitcher } from "@/components/progress-switcher";
 import { RangePicker } from "@/components/range-picker";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -146,6 +147,7 @@ export default async function TrendsPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <ProgressSwitcher active="stats" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="label-mono">Analytics</p>
