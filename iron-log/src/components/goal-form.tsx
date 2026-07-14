@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createGoal } from "@/app/(app)/goals/actions";
-import type { GoalMetric, GoalPeriod } from "@/lib/goals";
+import type { GoalMetric, GoalPeriod, WeekAnchor } from "@/lib/goals";
 import type { Exercise } from "@/lib/types";
 import { unitToKg, type WeightUnit } from "@/lib/units";
 
@@ -28,6 +28,7 @@ export function GoalForm({
   const router = useRouter();
   const [metric, setMetric] = useState<GoalMetric>("sessions");
   const [period, setPeriod] = useState<GoalPeriod>("weekly");
+  const [weekAnchor, setWeekAnchor] = useState<WeekAnchor>("monday");
   const [exerciseId, setExerciseId] = useState("");
   const [target, setTarget] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export function GoalForm({
         period: isWeight ? null : period,
         target: canonical,
         exerciseId: isWeight ? exerciseId || null : null,
+        weekAnchor,
       });
       if (result.error) {
         setError(result.error);
@@ -98,25 +100,54 @@ export function GoalForm({
             </select>
           </label>
         ) : (
-          <div className="flex flex-col gap-1 text-sm font-medium">
-            Period
-            <div className="flex gap-1 self-start rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
-              {(["weekly", "monthly"] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPeriod(p)}
-                  aria-pressed={period === p}
-                  className={`rounded-md px-4 py-1.5 text-sm font-semibold ${
-                    period === p
-                      ? "bg-(--accent) text-(--accent-ink)"
-                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  {p === "weekly" ? "Weekly" : "Monthly"}
-                </button>
-              ))}
+          <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col gap-1 text-sm font-medium">
+              Period
+              <div className="flex gap-1 self-start rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
+                {(["weekly", "monthly"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPeriod(p)}
+                    aria-pressed={period === p}
+                    className={`rounded-md px-4 py-1.5 text-sm font-semibold ${
+                      period === p
+                        ? "bg-(--accent) text-(--accent-ink)"
+                        : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    {p === "weekly" ? "Weekly" : "Monthly"}
+                  </button>
+                ))}
+              </div>
             </div>
+            {period === "weekly" && (
+              <div className="flex flex-col gap-1 text-sm font-medium">
+                Week window
+                <div className="flex gap-1 self-start rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
+                  {(
+                    [
+                      { value: "monday", label: "Starts Monday" },
+                      { value: "rolling", label: "Rolling 7 days" },
+                    ] as const
+                  ).map((a) => (
+                    <button
+                      key={a.value}
+                      type="button"
+                      onClick={() => setWeekAnchor(a.value)}
+                      aria-pressed={weekAnchor === a.value}
+                      className={`rounded-md px-4 py-1.5 text-sm font-semibold ${
+                        weekAnchor === a.value
+                          ? "bg-(--accent) text-(--accent-ink)"
+                          : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

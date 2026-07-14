@@ -10,6 +10,7 @@ import {
   type GoalInputs,
   type GoalMetric,
   type GoalPeriod,
+  type WeekAnchor,
 } from "@/lib/goals";
 import { createClient } from "@/lib/supabase/server";
 import { nameColorVar, workoutDisplayName, type WorkoutType } from "@/lib/types";
@@ -55,6 +56,8 @@ type GoalRow = {
   period: GoalPeriod | null;
   target: number;
   exercise_id: string | null;
+  created_at: string;
+  week_anchor: WeekAnchor;
   exercises: { name: string } | null;
 };
 
@@ -186,7 +189,9 @@ export default async function DashboardPage() {
       .limit(1),
     supabase
       .from("goals")
-      .select("id, metric, period, target, exercise_id, exercises(name)")
+      .select(
+        "id, metric, period, target, exercise_id, created_at, week_anchor, exercises(name)",
+      )
       .order("created_at", { ascending: false }),
   ]);
 
@@ -288,20 +293,26 @@ export default async function DashboardPage() {
       [...perExercise.entries()].map(([id, v]) => [id, v.maxKg]),
     ),
   };
-  const goalProgress = goals.map((row) => {
-    const goal: Goal = {
-      id: row.id,
-      metric: row.metric,
-      period: row.period,
-      target: Number(row.target),
-      exerciseId: row.exercise_id,
-    };
-    return {
-      goal,
-      label: goalLabel(goal, row.exercises?.name ?? null, unit),
-      progress: computeGoalProgress(goal, goalInputs),
-    };
-  });
+  const goalProgress = goals
+    .map((row) => {
+      const goal: Goal = {
+        id: row.id,
+        metric: row.metric,
+        period: row.period,
+        target: Number(row.target),
+        exerciseId: row.exercise_id,
+        createdAt: row.created_at,
+        weekAnchor: row.week_anchor ?? "monday",
+      };
+      return {
+        goal,
+        label: goalLabel(goal, row.exercises?.name ?? null, unit),
+        progress: computeGoalProgress(goal, goalInputs),
+      };
+    })
+    // Missed (expired, unachieved) goals are cleaned up on the goals page —
+    // don't show them in the tracker.
+    .filter(({ progress }) => !progress.missed);
 
   return (
     <div className="flex flex-col gap-6">

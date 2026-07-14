@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import {
   goalLabel,
+  goalWindow,
   newlyCompletedGoals,
   type Goal,
   type GoalInputs,
   type GoalMetric,
   type GoalPeriod,
+  type WeekAnchor,
 } from "@/lib/goals";
 import { collectBests, computePrFlags, type ExerciseBests } from "@/lib/pr";
 import { createClient } from "@/lib/supabase/server";
@@ -29,6 +31,8 @@ type CompletionGoalRow = {
   period: GoalPeriod | null;
   target: number;
   exercise_id: string | null;
+  created_at: string;
+  week_anchor: WeekAnchor;
   exercises: { name: string } | null;
 };
 
@@ -54,31 +58,53 @@ async function findCompletedGoals(
 ): Promise<CompletedGoal[]> {
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const weekStart = bucketKey(today, "weekly");
-    const monthStart = `${bucketKey(today, "monthly")}-01`;
-    const since = weekStart < monthStart ? weekStart : monthStart;
 
-    const [{ data: goalRows, error: goalsError }, { data: profile }, { data: windowWorkouts }, { data: windowSets }] =
+    const [{ data: goalRows, error: goalsError }, { data: profile }] =
       await Promise.all([
         supabase
           .from("goals")
-          .select("id, metric, period, target, exercise_id, exercises(name)"),
-        supabase.from("profiles").select("preferred_unit").maybeSingle(),
-        supabase
-          .from("workouts")
-          .select("id, date, type, duration_seconds")
-          .gte("date", `${since}T00:00:00Z`),
-        supabase
-          .from("sets")
           .select(
-            "weight, reps, workout_exercises!inner(workout_id, workouts!inner(date))",
-          )
-          .gte("workout_exercises.workouts.date", `${since}T00:00:00Z`),
+            "id, metric, period, target, exercise_id, created_at, week_anchor, exercises(name)",
+          ),
+        supabase.from("profiles").select("preferred_unit").maybeSingle(),
       ]);
     if (goalsError || !goalRows || goalRows.length === 0) return [];
 
     const goals = goalRows as unknown as CompletionGoalRow[];
     const unit: WeightUnit = profile?.preferred_unit === "kg" ? "kg" : "lb";
+
+    const goalList: Goal[] = goals.map((g) => ({
+      id: g.id,
+      metric: g.metric,
+      period: g.period,
+      target: Number(g.target),
+      exerciseId: g.exercise_id,
+      createdAt: g.created_at,
+      weekAnchor: g.week_anchor ?? "monday",
+    }));
+
+    // Fetch far enough back to cover the earliest goal window (goals are
+    // one-shot, so windows start at most ~a month ago).
+    const weekStart = bucketKey(today, "weekly");
+    const monthStart = `${bucketKey(today, "monthly")}-01`;
+    let since = weekStart < monthStart ? weekStart : monthStart;
+    for (const goal of goalList) {
+      const window = goalWindow(goal);
+      if (window && window.start < since) since = window.start;
+    }
+
+    const [{ data: windowWorkouts }, { data: windowSets }] = await Promise.all([
+      supabase
+        .from("workouts")
+        .select("id, date, type, duration_seconds")
+        .gte("date", `${since}T00:00:00Z`),
+      supabase
+        .from("sets")
+        .select(
+          "weight, reps, workout_exercises!inner(workout_id, workouts!inner(date))",
+        )
+        .gte("workout_exercises.workouts.date", `${since}T00:00:00Z`),
+    ]);
 
     // All-time bests per exercise (with/without the new workout), only for
     // exercises referenced by weight goals.
@@ -131,13 +157,6 @@ async function findCompletedGoals(
       };
     };
 
-    const goalList: Goal[] = goals.map((g) => ({
-      id: g.id,
-      metric: g.metric,
-      period: g.period,
-      target: Number(g.target),
-      exerciseId: g.exercise_id,
-    }));
     const nameById = new Map(goals.map((g) => [g.id, g.exercises?.name ?? null]));
 
     return newlyCompletedGoals(

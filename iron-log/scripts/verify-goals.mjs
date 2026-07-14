@@ -2,10 +2,11 @@
 // Run with: node --experimental-strip-types scripts/verify-goals.mjs
 import {
   computeGoalProgress,
-  currentBucket,
   goalLabel,
   goalValueLabel,
+  goalWindow,
   newlyCompletedGoals,
+  suggestGoals,
 } from "../src/lib/goals.ts";
 import { unitToKg } from "../src/lib/units.ts";
 
@@ -16,140 +17,143 @@ function check(label, ok) {
   else fail++;
 }
 
-const today = "2026-07-14"; // Tuesday; week bucket = Mon 2026-07-13
-check("weekly bucket is Monday", currentBucket(today, "weekly") === "2026-07-13");
-check("monthly bucket", currentBucket(today, "monthly") === "2026-07");
+const g = (over) => ({
+  id: "g",
+  metric: "sessions",
+  period: "weekly",
+  target: 3,
+  exerciseId: null,
+  createdAt: "2026-07-08", // a Wednesday
+  weekAnchor: "monday",
+  ...over,
+});
 
+// --- goalWindow ---
+const wMon = goalWindow(g({}));
+check("monday weekly window starts on the Monday of creation week", wMon.start === "2026-07-06");
+check("monday weekly window ends 7 days later", wMon.end === "2026-07-13");
+const wRoll = goalWindow(g({ weekAnchor: "rolling" }));
+check("rolling weekly window starts at creation", wRoll.start === "2026-07-08");
+check("rolling weekly window ends creation+7", wRoll.end === "2026-07-15");
+const wMonth = goalWindow(g({ period: "monthly" }));
+check("monthly window = calendar month", wMonth.start === "2026-07-01" && wMonth.end === "2026-08-01");
+check(
+  "standing goal has no window",
+  goalWindow(g({ metric: "exercise_weight", period: null, exerciseId: "bench" })) === null,
+);
+
+// --- window-scoped progress; rolling straddles a Monday ---
 const inputs = {
-  today,
-  // two days this week (13th twice = one day), one last week, one last month
-  workoutDates: ["2026-07-13", "2026-07-13", "2026-07-14", "2026-07-10", "2026-06-20"],
+  today: "2026-07-14",
+  // Sat 11th and Mon 13th: the rolling window (8th-14th) sees both; the
+  // monday-anchored window (6th-12th) sees only the 11th.
+  workoutDates: ["2026-07-11", "2026-07-13", "2026-07-04"],
   setRows: [
-    { date: "2026-07-13", weightKg: 100, reps: 5 }, // this week: 500
-    { date: "2026-07-14", weightKg: 50, reps: 10 }, // this week: 500
-    { date: "2026-07-06", weightKg: 200, reps: 5 }, // last week (this month): 1000
+    { date: "2026-07-11", weightKg: 100, reps: 5 }, // 500, in both windows
+    { date: "2026-07-13", weightKg: 100, reps: 5 }, // 500, rolling only
+    { date: "2026-07-04", weightKg: 999, reps: 9 }, // before both
   ],
   cardioRows: [
-    { date: "2026-07-13", durationSeconds: 1800 }, // 30 min this week
-    { date: "2026-07-01", durationSeconds: 1200 }, // 20 min this month, not this week
+    { date: "2026-07-13", durationSeconds: 1800 }, // 30 min, rolling only
   ],
-  exerciseBestKg: { bench: 102.06 }, // ~225 lb
+  exerciseBestKg: { bench: 102 },
 };
 
-// sessions weekly: 2 distinct days this week vs target 4
-const sessions = computeGoalProgress(
-  { id: "1", metric: "sessions", period: "weekly", target: 4, exerciseId: null },
-  inputs,
-);
-check("sessions weekly current=2", sessions.current === 2);
-check("sessions weekly pct=0.5", sessions.pct === 0.5);
-check("sessions weekly not achieved", !sessions.achieved);
+const rollSessions = computeGoalProgress(g({ weekAnchor: "rolling", target: 2 }), inputs);
+check("rolling sessions counts across the Monday boundary (2)", rollSessions.current === 2);
+check("rolling sessions achieved", rollSessions.achieved);
+const monSessions = computeGoalProgress(g({ target: 2 }), inputs);
+check("monday sessions only counts its calendar week (1)", monSessions.current === 1);
 
-// sessions monthly: 3 distinct July days (13, 14, 10)
-const sessionsM = computeGoalProgress(
-  { id: "1b", metric: "sessions", period: "monthly", target: 3, exerciseId: null },
+const rollVol = computeGoalProgress(
+  g({ metric: "volume", weekAnchor: "rolling", target: 1000 }),
   inputs,
 );
-check("sessions monthly current=3 achieved", sessionsM.current === 3 && sessionsM.achieved);
+check("rolling volume = 1000", rollVol.current === 1000 && rollVol.achieved);
+const monVol = computeGoalProgress(g({ metric: "volume", target: 1000 }), inputs);
+check("monday-week volume = 500", monVol.current === 500 && !monVol.achieved);
 
-// volume weekly: 1000 kg vs 2000 target
-const vol = computeGoalProgress(
-  { id: "2", metric: "volume", period: "weekly", target: 2000, exerciseId: null },
+const rollCardio = computeGoalProgress(
+  g({ metric: "cardio_minutes", weekAnchor: "rolling", target: 30 }),
   inputs,
 );
-check("volume weekly current=1000", vol.current === 1000);
+check("rolling cardio 30 min achieved", rollCardio.achieved);
 
-// volume monthly: 2000 kg vs 2000 target -> achieved
-const volM = computeGoalProgress(
-  { id: "2b", metric: "volume", period: "monthly", target: 2000, exerciseId: null },
+// --- expired / missed ---
+check("monday weekly expired on the 14th (window ended 13th)", monSessions.expired);
+check("unachieved+expired = missed", monSessions.missed);
+check("rolling window (ends 15th) not expired on the 14th", !rollSessions.expired);
+const expiredAchieved = computeGoalProgress(g({ target: 1 }), inputs);
+check("achieved+expired is NOT missed", expiredAchieved.expired && !expiredAchieved.missed);
+const standing = computeGoalProgress(
+  g({ metric: "exercise_weight", period: null, exerciseId: "bench", target: 100 }),
   inputs,
 );
-check("volume monthly achieved at exactly target", volM.achieved && volM.pct === 1);
+check("standing goal never expires", !standing.expired && !standing.missed);
+check("standing goal achieved from best-ever", standing.achieved);
 
-// cardio weekly: 30 min vs 90
-const cardio = computeGoalProgress(
-  { id: "3", metric: "cardio_minutes", period: "weekly", target: 90, exerciseId: null },
+// --- newlyCompletedGoals still detects fresh crossings ---
+const before = { ...inputs, workoutDates: ["2026-07-11"], setRows: [inputs.setRows[0]], cardioRows: [] };
+const crossed = newlyCompletedGoals(
+  [g({ weekAnchor: "rolling", target: 2, id: "cross" }), g({ target: 1, id: "already" })],
+  before,
   inputs,
 );
-check("cardio weekly current=30", cardio.current === 30);
+check("fresh crossing detected", crossed.some((x) => x.id === "cross"));
+check("already-achieved does not re-fire", !crossed.some((x) => x.id === "already"));
 
-// cardio monthly: 50 min
-const cardioM = computeGoalProgress(
-  { id: "3b", metric: "cardio_minutes", period: "monthly", target: 90, exerciseId: null },
-  inputs,
-);
-check("cardio monthly current=50", cardioM.current === 50);
-
-// exercise weight: best 102.06 vs target 100 kg -> achieved; vs 110 -> not
-const exHit = computeGoalProgress(
-  { id: "4", metric: "exercise_weight", period: null, target: 100, exerciseId: "bench" },
-  inputs,
-);
-check("exercise_weight achieved", exHit.achieved);
-const exMiss = computeGoalProgress(
-  { id: "5", metric: "exercise_weight", period: null, target: 110, exerciseId: "bench" },
-  inputs,
-);
-check("exercise_weight not achieved, pct<1", !exMiss.achieved && exMiss.pct < 1);
-const exUnknown = computeGoalProgress(
-  { id: "6", metric: "exercise_weight", period: null, target: 110, exerciseId: "nope" },
-  inputs,
-);
-check("unknown exercise -> current 0", exUnknown.current === 0);
-
-// labels
+// --- labels ---
 check(
-  "sessions label",
-  goalLabel({ id: "x", metric: "sessions", period: "weekly", target: 4, exerciseId: null }, null, "lb") ===
-    "4 sessions / week",
+  "rolling weekly label says / 7 days",
+  goalLabel(g({ weekAnchor: "rolling", target: 4 }), null, "lb") === "4 sessions / 7 days",
+);
+check(
+  "monday weekly label says / week",
+  goalLabel(g({ target: 4 }), null, "lb") === "4 sessions / week",
 );
 check(
   "exercise label converts kg->lb",
   goalLabel(
-    { id: "x", metric: "exercise_weight", period: null, target: unitToKg(225, "lb"), exerciseId: "bench" },
+    g({ metric: "exercise_weight", period: null, target: unitToKg(225, "lb"), exerciseId: "bench" }),
     "Bench Press",
     "lb",
   ) === "Bench Press · 225 lb",
 );
 check(
   "cardio value label",
-  goalValueLabel({ id: "x", metric: "cardio_minutes", period: "weekly", target: 90, exerciseId: null }, 30, "lb") ===
-    "30 min",
+  goalValueLabel(g({ metric: "cardio_minutes" }), 30, "lb") === "30 min",
 );
 
-// newlyCompletedGoals: simulate saving a workout today (2026-07-14) that adds
-// one session, 600 kg volume, and a 105 kg bench set.
-const before = {
-  today,
-  workoutDates: ["2026-07-13"],
-  setRows: [{ date: "2026-07-13", weightKg: 100, reps: 5 }], // 500 kg this week
-  cardioRows: [],
-  exerciseBestKg: { bench: 100 },
-};
-const after = {
-  today,
-  workoutDates: ["2026-07-13", "2026-07-14"],
-  setRows: [
-    { date: "2026-07-13", weightKg: 100, reps: 5 },
-    { date: "2026-07-14", weightKg: 105, reps: 5 }, // +525 -> 1025 this week
-  ],
-  cardioRows: [],
-  exerciseBestKg: { bench: 105 },
-};
-const candidates = [
-  { id: "s2", metric: "sessions", period: "weekly", target: 2, exerciseId: null }, // 1 -> 2: crosses
-  { id: "v1000", metric: "volume", period: "weekly", target: 1000, exerciseId: null }, // 500 -> 1025: crosses
-  { id: "w105", metric: "exercise_weight", period: null, target: 105, exerciseId: "bench" }, // 100 -> 105: crosses
-  { id: "s1", metric: "sessions", period: "weekly", target: 1, exerciseId: null }, // already achieved: no re-fire
-  { id: "v9999", metric: "volume", period: "weekly", target: 9999, exerciseId: null }, // still unachieved
-];
-const completed = newlyCompletedGoals(candidates, before, after).map((g) => g.id);
-check("sessions crossing detected", completed.includes("s2"));
-check("volume crossing detected", completed.includes("v1000"));
-check("exercise-weight crossing detected", completed.includes("w105"));
-check("already-achieved goal does not re-fire", !completed.includes("s1"));
-check("still-unachieved goal not included", !completed.includes("v9999"));
-check("exactly 3 completions", completed.length === 3);
+// --- suggestGoals (unchanged rules) ---
+const kg10klb = 10000 / 2.2046226218487757;
+const bulk = suggestGoals(
+  { frequency: "3-4", objective: "bulk", cardio: "none" },
+  { avgWeeklyVolumeKg: kg10klb, unit: "lb" },
+);
+check("bulk: weekly sessions = 4", bulk.some((s) => s.metric === "sessions" && s.period === "weekly" && s.target === 4));
+check("bulk: monthly sessions = 16", bulk.some((s) => s.metric === "sessions" && s.period === "monthly" && s.target === 16));
+check(
+  "bulk: volume = 11,500 lb rounded clean",
+  Math.round(unitToKg(11500, "lb") * 100) ===
+    Math.round(bulk.find((s) => s.metric === "volume").target * 100),
+);
+check("bulk + no cardio: no cardio goal", !bulk.some((s) => s.metric === "cardio_minutes"));
+const cut = suggestGoals(
+  { frequency: "5-6", objective: "cut", cardio: "light" },
+  { avgWeeklyVolumeKg: kg10klb, unit: "lb" },
+);
+check("cut: cardio floor 90 min", cut.some((s) => s.metric === "cardio_minutes" && s.target === 90));
+const noHistory = suggestGoals(
+  { frequency: "2-3", objective: "maintain", cardio: "regular" },
+  { avgWeeklyVolumeKg: null, unit: "kg" },
+);
+check("no history: volume suggestion skipped", !noHistory.some((s) => s.metric === "volume"));
+check("regular cardio: 60 min", noHistory.some((s) => s.metric === "cardio_minutes" && s.target === 60));
+const kgUser = suggestGoals(
+  { frequency: "3-4", objective: "maintain", cardio: "none" },
+  { avgWeeklyVolumeKg: 4100, unit: "kg" },
+);
+check("kg rounding to 250 step", kgUser.find((s) => s.metric === "volume").target % 250 === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

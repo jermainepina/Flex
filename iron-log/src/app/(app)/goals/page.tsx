@@ -1,15 +1,17 @@
-import { CircularStat } from "@/components/circular-stat";
-import { DeleteGoalButton } from "@/components/delete-goal-button";
+import { GoalCard } from "@/components/goal-card";
 import { GoalForm } from "@/components/goal-form";
+import { GoalWizard } from "@/components/goal-wizard";
 import { PageHeader } from "@/components/page-header";
 import {
   computeGoalProgress,
   goalLabel,
   goalValueLabel,
+  goalWindow,
   type Goal,
   type GoalInputs,
   type GoalMetric,
   type GoalPeriod,
+  type WeekAnchor,
 } from "@/lib/goals";
 import { createClient } from "@/lib/supabase/server";
 import { type WeightUnit } from "@/lib/units";
@@ -21,6 +23,8 @@ type GoalRow = {
   period: GoalPeriod | null;
   target: number;
   exercise_id: string | null;
+  created_at: string;
+  week_anchor: WeekAnchor;
   exercises: { name: string } | null;
 };
 
@@ -39,19 +43,69 @@ export default async function GoalsPage() {
   const supabase = await createClient();
 
   const today = new Date().toISOString().slice(0, 10);
-  // Window covering both the current week and the current month.
-  const weekStart = bucketKey(today, "weekly");
-  const monthStart = `${bucketKey(today, "monthly")}-01`;
-  const since = weekStart < monthStart ? weekStart : monthStart;
+  // Wizard volume anchor: the last 4 full-ish weeks of lifting.
+  const wizardSinceDate = new Date(`${today}T00:00:00Z`);
+  wizardSinceDate.setUTCDate(wizardSinceDate.getUTCDate() - 28);
+  const wizardSince = wizardSinceDate.toISOString().slice(0, 10);
 
-  const [{ data: profile }, { data: goalRows }, { data: exercises }, { data: windowWorkouts }, { data: windowSets }] =
+  // Stage 1: goals first — their windows decide how far back stage 2 fetches.
+  const [{ data: profile }, { data: goalRows }, { data: exercises }, { data: wizardSets }] =
     await Promise.all([
       supabase.from("profiles").select("preferred_unit").maybeSingle(),
       supabase
         .from("goals")
-        .select("id, metric, period, target, exercise_id, exercises(name)")
+        .select(
+          "id, metric, period, target, exercise_id, created_at, week_anchor, exercises(name)",
+        )
         .order("created_at", { ascending: false }),
       supabase.from("exercises").select("id, name").order("name"),
+      supabase
+        .from("sets")
+        .select("weight, reps, workout_exercises!inner(workouts!inner(date))")
+        .gte("workout_exercises.workouts.date", `${wizardSince}T00:00:00Z`),
+    ]);
+
+  const unit: WeightUnit = profile?.preferred_unit === "kg" ? "kg" : "lb";
+  const rows = (goalRows ?? []) as unknown as GoalRow[];
+  const goals: (Goal & { exerciseName: string | null })[] = rows.map((row) => ({
+    id: row.id,
+    metric: row.metric,
+    period: row.period,
+    target: Number(row.target),
+    exerciseId: row.exercise_id,
+    createdAt: row.created_at,
+    weekAnchor: row.week_anchor ?? "monday",
+    exerciseName: row.exercises?.name ?? null,
+  }));
+
+  let avgWeeklyVolumeKg: number | null = null;
+  const wizardRows = (wizardSets ?? []) as unknown as WindowSetRow[];
+  if (wizardRows.length > 0) {
+    avgWeeklyVolumeKg =
+      wizardRows.reduce((sum, s) => sum + s.weight * s.reps, 0) / 4;
+  }
+
+  // Stage 2: aggregates reaching back to the earliest goal window start
+  // (goals are one-shot; missed ones get cleaned up on this page, so this
+  // stays around a month of data).
+  const weekStart = bucketKey(today, "weekly");
+  const monthStart = `${bucketKey(today, "monthly")}-01`;
+  let since = weekStart < monthStart ? weekStart : monthStart;
+  for (const goal of goals) {
+    const window = goalWindow(goal);
+    if (window && window.start < since) since = window.start;
+  }
+
+  const weightGoalExerciseIds = [
+    ...new Set(
+      goals
+        .filter((g) => g.metric === "exercise_weight" && g.exerciseId)
+        .map((g) => g.exerciseId as string),
+    ),
+  ];
+
+  const [{ data: windowWorkouts }, { data: windowSets }, { data: bestRows }] =
+    await Promise.all([
       supabase
         .from("workouts")
         .select("date, type, duration_seconds")
@@ -60,29 +114,18 @@ export default async function GoalsPage() {
         .from("sets")
         .select("weight, reps, workout_exercises!inner(workouts!inner(date))")
         .gte("workout_exercises.workouts.date", `${since}T00:00:00Z`),
+      weightGoalExerciseIds.length > 0
+        ? supabase
+            .from("sets")
+            .select("weight, workout_exercises!inner(exercise_id)")
+            .in("workout_exercises.exercise_id", weightGoalExerciseIds)
+        : Promise.resolve({ data: [] as unknown[] }),
     ]);
 
-  const unit: WeightUnit = profile?.preferred_unit === "kg" ? "kg" : "lb";
-  const goals = (goalRows ?? []) as unknown as GoalRow[];
-
-  // Heaviest set ever, but only for exercises referenced by weight goals.
-  const weightGoalExerciseIds = [
-    ...new Set(
-      goals
-        .filter((g) => g.metric === "exercise_weight" && g.exercise_id)
-        .map((g) => g.exercise_id as string),
-    ),
-  ];
   const exerciseBestKg: Record<string, number> = {};
-  if (weightGoalExerciseIds.length > 0) {
-    const { data: bestRows } = await supabase
-      .from("sets")
-      .select("weight, workout_exercises!inner(exercise_id)")
-      .in("workout_exercises.exercise_id", weightGoalExerciseIds);
-    for (const row of (bestRows ?? []) as unknown as BestSetRow[]) {
-      const id = row.workout_exercises.exercise_id;
-      exerciseBestKg[id] = Math.max(exerciseBestKg[id] ?? 0, row.weight);
-    }
+  for (const row of (bestRows ?? []) as unknown as BestSetRow[]) {
+    const id = row.workout_exercises.exercise_id;
+    exerciseBestKg[id] = Math.max(exerciseBestKg[id] ?? 0, row.weight);
   }
 
   const workouts = windowWorkouts ?? [];
@@ -112,6 +155,8 @@ export default async function GoalsPage() {
         titleB="Goals"
       />
 
+      <GoalWizard avgWeeklyVolumeKg={avgWeeklyVolumeKg} unit={unit} />
+
       <GoalForm exercises={exercises ?? []} unit={unit} />
 
       {goals.length === 0 ? (
@@ -120,44 +165,17 @@ export default async function GoalsPage() {
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {goals.map((row) => {
-            const goal: Goal = {
-              id: row.id,
-              metric: row.metric,
-              period: row.period,
-              target: Number(row.target),
-              exerciseId: row.exercise_id,
-            };
+          {goals.map(({ exerciseName, ...goal }) => {
             const progress = computeGoalProgress(goal, inputs);
+            const valueText = `${goalValueLabel(goal, progress.current, unit)} of ${goalValueLabel(goal, progress.target, unit)}${goal.metric === "exercise_weight" ? " (best ever)" : ""}`;
             return (
-              <section
+              <GoalCard
                 key={goal.id}
-                className={`card flex items-center gap-4 p-4 ${
-                  progress.achieved ? "ring-2 ring-[var(--accent)]" : ""
-                }`}
-              >
-                <CircularStat pct={progress.pct} size={56} strokeWidth={5}>
-                  <span className="font-display text-sm">
-                    {progress.achieved ? "✓" : `${Math.round(progress.pct * 100)}%`}
-                  </span>
-                </CircularStat>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {goalLabel(goal, row.exercises?.name ?? null, unit)}
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {goalValueLabel(goal, progress.current, unit)} of{" "}
-                    {goalValueLabel(goal, progress.target, unit)}
-                    {goal.metric === "exercise_weight" ? " (best ever)" : ""}
-                  </p>
-                  {progress.achieved && (
-                    <p className="label-mono mt-0.5" style={{ color: "var(--accent-text)" }}>
-                      Achieved
-                    </p>
-                  )}
-                </div>
-                <DeleteGoalButton goalId={goal.id} />
-              </section>
+                goal={goal}
+                label={goalLabel(goal, exerciseName, unit)}
+                valueText={valueText}
+                progress={progress}
+              />
             );
           })}
         </div>
