@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ChevronDown, Plus } from "lucide-react";
 import { createGoal } from "@/app/(app)/goals/actions";
 import type { GoalMetric, GoalPeriod, WeekAnchor } from "@/lib/goals";
 import type { Exercise } from "@/lib/types";
@@ -26,6 +27,7 @@ export function GoalForm({
   unit: WeightUnit;
 }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [metric, setMetric] = useState<GoalMetric>("sessions");
   const [period, setPeriod] = useState<GoalPeriod>("weekly");
   const [weekAnchor, setWeekAnchor] = useState<WeekAnchor>("monday");
@@ -60,13 +62,35 @@ export function GoalForm({
         return;
       }
       setTarget("");
+      setOpen(false);
       router.refresh();
     });
   }
 
   return (
-    <section className="card flex flex-col gap-3 p-4">
-      <p className="label-mono">New goal</p>
+    <section className="card flex flex-col p-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center justify-between gap-3 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <Plus size={16} aria-hidden style={{ color: "var(--accent-text)" }} />
+          <span className="text-sm font-semibold">New goal</span>
+          <span className="hidden text-xs text-zinc-500 sm:inline dark:text-zinc-400">
+            set a custom target yourself
+          </span>
+        </span>
+        <ChevronDown
+          size={16}
+          aria-hidden
+          className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-4 flex flex-col gap-3">
       <div className="flex flex-wrap gap-3">
         <label className="flex min-w-48 flex-1 flex-col gap-1 text-sm font-medium">
           Goal type
@@ -186,6 +210,8 @@ export function GoalForm({
       >
         {saving ? "Adding…" : "Add goal"}
       </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { CircularStat } from "@/components/circular-stat";
+import { MacroBars } from "@/components/macro-bars";
 import { PageHeader } from "@/components/page-header";
 import { TrainingHeatmap } from "@/components/training-heatmap";
+import { dailyTotals, type NutritionTargets } from "@/lib/nutrition";
 import {
   computeGoalProgress,
   goalLabel,
@@ -156,6 +158,8 @@ export default async function DashboardPage() {
     { data: streakRows },
     { data: latestPrRows },
     { data: goalRows },
+    { data: nutritionRow },
+    { data: todayFood },
   ] = await Promise.all([
     supabase.from("profiles").select("display_name, preferred_unit").maybeSingle(),
     supabase.auth.getUser(),
@@ -192,7 +196,16 @@ export default async function DashboardPage() {
       .select(
         "id, metric, period, target, exercise_id, created_at, week_anchor, exercises(name)",
       )
+      .order("position", { ascending: true })
       .order("created_at", { ascending: false }),
+    supabase
+      .from("nutrition_goals")
+      .select("calories, protein_g, carbs_g, fat_g, sugar_g")
+      .maybeSingle(),
+    supabase
+      .from("food_logs")
+      .select("calories, protein_g, carbs_g, fat_g, sugar_g")
+      .eq("date", new Date().toLocaleDateString("en-CA")),
   ]);
 
   const unit: WeightUnit = profile?.preferred_unit === "kg" ? "kg" : "lb";
@@ -314,6 +327,26 @@ export default async function DashboardPage() {
     // don't show them in the tracker.
     .filter(({ progress }) => !progress.missed);
 
+  // Nutrition: today's food totals vs the user's daily targets.
+  const nutritionTargets: NutritionTargets | null = nutritionRow
+    ? {
+        calories: nutritionRow.calories,
+        proteinG: nutritionRow.protein_g,
+        carbsG: nutritionRow.carbs_g,
+        fatG: nutritionRow.fat_g,
+        sugarG: nutritionRow.sugar_g,
+      }
+    : null;
+  const foodTotals = dailyTotals(
+    (todayFood ?? []).map((e) => ({
+      calories: Number(e.calories),
+      proteinG: Number(e.protein_g),
+      carbsG: Number(e.carbs_g),
+      fatG: Number(e.fat_g),
+      sugarG: Number(e.sugar_g),
+    })),
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -359,7 +392,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <ul className="mt-4 flex flex-col gap-4">
-            {goalProgress.map(({ goal, label, progress }) => (
+            {goalProgress.slice(0, 3).map(({ goal, label, progress }) => (
               <li key={goal.id} className="flex items-center gap-4">
                 <CircularStat pct={progress.pct} size={52} strokeWidth={5}>
                   <span className="font-display text-xs">
@@ -382,6 +415,36 @@ export default async function DashboardPage() {
               </li>
             ))}
           </ul>
+          {goalProgress.length > 3 && (
+            <Link
+              href="/goals"
+              className="mt-4 block rounded-md border border-zinc-200 py-2.5 text-center text-sm font-medium hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800"
+            >
+              View {goalProgress.length - 3} more goal
+              {goalProgress.length - 3 === 1 ? "" : "s"} →
+            </Link>
+          )}
+        </section>
+      )}
+
+      {nutritionTargets && (
+        <section className="card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="label-mono">Nutrition</p>
+              <h2 className="mt-1 font-semibold">Today</h2>
+            </div>
+            <Link
+              href="/log/food"
+              className="text-sm font-medium"
+              style={{ color: "var(--accent-text)" }}
+            >
+              Log food →
+            </Link>
+          </div>
+          <div className="mt-4">
+            <MacroBars totals={foodTotals} targets={nutritionTargets} />
+          </div>
         </section>
       )}
 

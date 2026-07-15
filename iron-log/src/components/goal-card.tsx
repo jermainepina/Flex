@@ -18,11 +18,14 @@ export function GoalCard({
   label,
   valueText,
   progress,
+  handle,
 }: {
   goal: Goal;
   label: string;
   valueText: string;
   progress: GoalProgress;
+  /** Optional drag handle (rendered leftmost) supplied by the sortable list. */
+  handle?: React.ReactNode;
 }) {
   const router = useRouter();
   const [dismissing, setDismissing] = useState(false);
@@ -71,6 +74,7 @@ export function GoalCard({
             : ""
       } ${dismissing ? "scale-95 opacity-0" : ""}`}
     >
+      {handle}
       {missed ? (
         <span
           aria-hidden

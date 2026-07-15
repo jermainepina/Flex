@@ -11,7 +11,9 @@ export function RangePicker({ from, to }: { from: string; to: string }) {
 
   function push(nextFrom: string, nextTo: string) {
     if (!nextFrom || !nextTo) return;
-    router.push(`/trends?range=custom&from=${nextFrom}&to=${nextTo}`);
+    router.push(`/trends?range=custom&from=${nextFrom}&to=${nextTo}`, {
+      scroll: false,
+    });
   }
 
   return (

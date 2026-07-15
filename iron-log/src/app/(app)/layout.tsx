@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Dumbbell } from "lucide-react";
 import { NavBar } from "@/components/nav-bar";
+import { ProfileMenu } from "@/components/profile-menu";
 import { SetupNotice } from "@/components/setup-notice";
 import { TopNav } from "@/components/top-nav";
 import { createClient } from "@/lib/supabase/server";
@@ -49,15 +50,10 @@ export default async function AppLayout({
             </span>
           </Link>
           <TopNav />
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            title={profile?.display_name || user.email || "Settings"}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold"
-            style={{ background: "var(--accent)", color: "var(--accent-ink)" }}
-          >
-            {initials}
-          </Link>
+          <ProfileMenu
+            initials={initials}
+            title={profile?.display_name || user.email || "Profile"}
+          />
         </div>
       </header>
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 sm:pb-8">

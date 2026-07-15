@@ -97,7 +97,7 @@ export default async function TrendsPage({
   }
 
   const supabase = await createClient();
-  const [{ data: profile }, { data: wideRows }, { data: exerciseRows }] =
+  const [{ data: profile }, { data: wideRows }, { data: exerciseRows }, { data: weighRows }] =
     await Promise.all([
       supabase.from("profiles").select("preferred_unit").maybeSingle(),
       supabase
@@ -106,6 +106,11 @@ export default async function TrendsPage({
           "weight, reps, workout_exercises!inner(workout_id, exercise_id, workouts!inner(date), exercises!inner(muscle_group))",
         ),
       supabase.from("exercises").select("id, name").order("name"),
+      supabase
+        .from("body_weight_logs")
+        .select("date, weight_kg")
+        .gte("date", isoAddDays(todayIso, -90))
+        .order("date", { ascending: true }),
     ]);
 
   const unit: WeightUnit = profile?.preferred_unit === "kg" ? "kg" : "lb";
@@ -181,6 +186,10 @@ export default async function TrendsPage({
           custom={custom}
           unit={unit}
           lifts={lifts}
+          bodyweight={(weighRows ?? []).map((w) => ({
+            label: w.date.slice(5, 10),
+            weight: Math.round(kgToUnit(Number(w.weight_kg), unit) * 10) / 10,
+          }))}
         />
       ) : (
         <ExerciseTab
@@ -201,6 +210,7 @@ function OverviewTab({
   custom,
   unit,
   lifts,
+  bodyweight,
 }: {
   rows: WideSetRow[];
   hasAnyData: boolean;
@@ -208,6 +218,7 @@ function OverviewTab({
   custom: CustomRange | null;
   unit: WeightUnit;
   lifts: { id: string; name: string; rate: ReturnType<typeof progressionRate> }[];
+  bodyweight: { label: string; weight: number }[];
 }) {
   // Custom range filters to [from, to] and picks a bucket size for the span;
   // preset ranges keep their standard caps.
@@ -304,6 +315,7 @@ function OverviewTab({
               <Link
                 key={r.key}
                 href={`/trends?range=${r.key}`}
+                scroll={false}
                 className={`${toggleBase} ${!custom && range === r.key ? toggleOn : toggleOff}`}
               >
                 {r.label}
@@ -311,6 +323,7 @@ function OverviewTab({
             ))}
             <Link
               href={`/trends?range=custom&from=${custom?.from ?? defaultCustomFrom()}&to=${custom?.to ?? defaultCustomTo()}`}
+              scroll={false}
               className={`${toggleBase} ${custom ? toggleOn : toggleOff}`}
             >
               Custom
@@ -376,6 +389,26 @@ function OverviewTab({
           </>
         ) : (
           <p className={emptyBox}>No data yet.</p>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="font-medium">
+          Bodyweight{" "}
+          <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
+            (daily weigh-ins, last 90 days, {unit})
+          </span>
+        </h2>
+        {bodyweight.length >= 2 ? (
+          <ExerciseTrendChart data={bodyweight} unit={unit} color="var(--chart-2)" />
+        ) : (
+          <p className={emptyBox}>
+            Log weigh-ins from the{" "}
+            <Link href="/log/food" className="font-medium underline">
+              Food page
+            </Link>{" "}
+            (or your profile) to see your bodyweight trend.
+          </p>
         )}
       </section>
     </div>

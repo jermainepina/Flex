@@ -1,7 +1,9 @@
-import { GoalCard } from "@/components/goal-card";
 import { GoalForm } from "@/components/goal-form";
+import { GoalList, type GoalListItem } from "@/components/goal-list";
 import { GoalWizard } from "@/components/goal-wizard";
+import { NutritionTargets } from "@/components/nutrition-targets";
 import { PageHeader } from "@/components/page-header";
+import type { NutritionTargets as Targets } from "@/lib/nutrition";
 import {
   computeGoalProgress,
   goalLabel,
@@ -49,21 +51,46 @@ export default async function GoalsPage() {
   const wizardSince = wizardSinceDate.toISOString().slice(0, 10);
 
   // Stage 1: goals first — their windows decide how far back stage 2 fetches.
-  const [{ data: profile }, { data: goalRows }, { data: exercises }, { data: wizardSets }] =
-    await Promise.all([
-      supabase.from("profiles").select("preferred_unit").maybeSingle(),
-      supabase
-        .from("goals")
-        .select(
-          "id, metric, period, target, exercise_id, created_at, week_anchor, exercises(name)",
-        )
-        .order("created_at", { ascending: false }),
-      supabase.from("exercises").select("id, name").order("name"),
-      supabase
-        .from("sets")
-        .select("weight, reps, workout_exercises!inner(workouts!inner(date))")
-        .gte("workout_exercises.workouts.date", `${wizardSince}T00:00:00Z`),
-    ]);
+  const [
+    { data: profile },
+    { data: goalRows },
+    { data: exercises },
+    { data: wizardSets },
+    { data: recentWorkoutDays },
+    { data: nutritionRow },
+    { data: latestWeigh },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("preferred_unit, height_cm, birth_year, sex")
+      .maybeSingle(),
+    supabase
+      .from("goals")
+      .select(
+        "id, metric, period, target, exercise_id, created_at, week_anchor, exercises(name)",
+      )
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: false }),
+    supabase.from("exercises").select("id, name").order("name"),
+    supabase
+      .from("sets")
+      .select("weight, reps, workout_exercises!inner(workouts!inner(date))")
+      .gte("workout_exercises.workouts.date", `${wizardSince}T00:00:00Z`),
+    supabase
+      .from("workouts")
+      .select("date")
+      .gte("date", `${wizardSince}T00:00:00Z`),
+    supabase
+      .from("nutrition_goals")
+      .select("calories, protein_g, carbs_g, fat_g, sugar_g")
+      .maybeSingle(),
+    supabase
+      .from("body_weight_logs")
+      .select("weight_kg")
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const unit: WeightUnit = profile?.preferred_unit === "kg" ? "kg" : "lb";
   const rows = (goalRows ?? []) as unknown as GoalRow[];
@@ -84,6 +111,23 @@ export default async function GoalsPage() {
     avgWeeklyVolumeKg =
       wizardRows.reduce((sum, s) => sum + s.weight * s.reps, 0) / 4;
   }
+
+  // Real training frequency for nutrition suggestions: distinct trained days
+  // over the last 4 weeks.
+  const trainedDays = new Set(
+    (recentWorkoutDays ?? []).map((w) => w.date.slice(0, 10)),
+  );
+  const sessionsPerWeek = trainedDays.size / 4;
+
+  const nutritionTargets: Targets | null = nutritionRow
+    ? {
+        calories: nutritionRow.calories,
+        proteinG: nutritionRow.protein_g,
+        carbsG: nutritionRow.carbs_g,
+        fatG: nutritionRow.fat_g,
+        sugarG: nutritionRow.sugar_g,
+      }
+    : null;
 
   // Stage 2: aggregates reaching back to the earliest goal window start
   // (goals are one-shot; missed ones get cleaned up on this page, so this
@@ -159,26 +203,36 @@ export default async function GoalsPage() {
 
       <GoalForm exercises={exercises ?? []} unit={unit} />
 
+      <NutritionTargets
+        initial={nutritionTargets}
+        weightKg={latestWeigh?.weight_kg ?? null}
+        heightCm={profile?.height_cm ?? null}
+        birthYear={profile?.birth_year ?? null}
+        sex={
+          profile?.sex === "male" || profile?.sex === "female" ? profile.sex : null
+        }
+        sessionsPerWeek={sessionsPerWeek}
+        currentYear={new Date().getUTCFullYear()}
+      />
+
       {goals.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           No goals yet — set your first one above.
         </p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {goals.map(({ exerciseName, ...goal }) => {
+        <GoalList
+          // Remount on create/delete so server order and items stay in sync.
+          key={goals.map((g) => g.id).join(",")}
+          items={goals.map(({ exerciseName, ...goal }): GoalListItem => {
             const progress = computeGoalProgress(goal, inputs);
-            const valueText = `${goalValueLabel(goal, progress.current, unit)} of ${goalValueLabel(goal, progress.target, unit)}${goal.metric === "exercise_weight" ? " (best ever)" : ""}`;
-            return (
-              <GoalCard
-                key={goal.id}
-                goal={goal}
-                label={goalLabel(goal, exerciseName, unit)}
-                valueText={valueText}
-                progress={progress}
-              />
-            );
+            return {
+              goal,
+              label: goalLabel(goal, exerciseName, unit),
+              valueText: `${goalValueLabel(goal, progress.current, unit)} of ${goalValueLabel(goal, progress.target, unit)}${goal.metric === "exercise_weight" ? " (best ever)" : ""}`,
+              progress,
+            };
           })}
-        </div>
+        />
       )}
     </div>
   );

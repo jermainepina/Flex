@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   ChartLine,
   ClipboardList,
@@ -9,6 +10,7 @@ import {
   Plus,
   Target,
 } from "lucide-react";
+import { LogSheet } from "@/components/log-sheet";
 
 const TABS = [
   { href: "/dashboard", label: "Home", Icon: House },
@@ -22,6 +24,7 @@ const TABS = [
 /** Mobile bottom tab bar (hidden on sm+ where the pill nav shows). */
 export function NavBar() {
   const pathname = usePathname();
+  const [logOpen, setLogOpen] = useState(false);
 
   return (
     <nav
@@ -36,17 +39,18 @@ export function NavBar() {
               : pathname.startsWith(href) ||
                 (also !== undefined && pathname.startsWith(also));
           const isLog = href === "/log";
-          return (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className="flex flex-col items-center justify-center gap-1 text-[11px] font-medium"
-              style={{
-                color: active && !isLog ? "var(--accent-text)" : undefined,
-              }}
-            >
-              {isLog ? (
+
+          if (isLog) {
+            // Log opens the what-to-log sheet instead of navigating.
+            return (
+              <button
+                key={href}
+                type="button"
+                onClick={() => setLogOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={logOpen}
+                className="flex flex-col items-center justify-center gap-1 text-[11px] font-medium"
+              >
                 <span
                   aria-hidden
                   className="flex h-9 w-9 items-center justify-center rounded-full"
@@ -54,20 +58,32 @@ export function NavBar() {
                 >
                   <Icon size={20} strokeWidth={2.5} />
                 </span>
-              ) : (
-                <Icon
-                  aria-hidden
-                  size={20}
-                  className={active ? "" : "text-zinc-500 dark:text-zinc-400"}
-                />
-              )}
-              <span className={active || isLog ? "" : "text-zinc-500 dark:text-zinc-400"}>
+                <span>{label}</span>
+              </button>
+            );
+          }
+
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className="flex flex-col items-center justify-center gap-1 text-[11px] font-medium"
+              style={{ color: active ? "var(--accent-text)" : undefined }}
+            >
+              <Icon
+                aria-hidden
+                size={20}
+                className={active ? "" : "text-zinc-500 dark:text-zinc-400"}
+              />
+              <span className={active ? "" : "text-zinc-500 dark:text-zinc-400"}>
                 {label}
               </span>
             </Link>
           );
         })}
       </div>
+      {logOpen && <LogSheet onClose={() => setLogOpen(false)} />}
     </nav>
   );
 }
